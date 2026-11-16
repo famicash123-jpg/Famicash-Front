@@ -506,6 +506,8 @@ export default function App() {
 
           {vista === 'reports' && (
             <VistaReportes
+              taxonomia={taxonomia}
+              mediosPago={mediosPago}
               periodoTipo={periodoTipo}
               periodoClave={periodoClave}
               filtros={filtros}
@@ -514,6 +516,7 @@ export default function App() {
               onClearDrillInicial={() => setDrillInicial(null)}
               onEditTransaccion={handleEditTransaccion}
               onDeleteTransaccion={handleSolicitarEliminarTx}
+              onQuickAddTransaccion={handleSaveTransaccion}
               refreshKey={refreshKey}
             />
           )}

@@ -57,7 +57,7 @@ export default function VistaObjetivos({
     usuarios: [],
     tipos: TIPOS_BASE.map((t) => t.label)
   });
-  const [mostrarGuia, setMostrarGuia] = useState(true);
+  const [mostrarGuia, setMostrarGuia] = useState(false);
 
   // Qué tarjetas tienen su historial de auditoría desplegado (id -> boolean)
   const [auditoriaAbierta, setAuditoriaAbierta] = useState({});
@@ -309,7 +309,12 @@ export default function VistaObjetivos({
         >
           <div className="goals-explainer-title">
             <HelpCircle size={18} className="icon-forest" />
-            <strong>¿Cómo funcionan tus Metas de Ahorro y su Auditoría?</strong>
+            <div>
+              <strong>Metas de Ahorro (Alcancías)</strong>
+              <small style={{ display: 'block', color: '#64748b', fontWeight: 500 }}>
+                Junta dinero poco a poco para un objetivo. (Para limitar gastos del mes, usa Topes).
+              </small>
+            </div>
           </div>
           <button type="button" className="btn-collapse-toggle">
             {mostrarGuia ? (

@@ -11,7 +11,9 @@ import {
   Copy,
   Trash2,
   Pencil,
-  X
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { api } from '../api';
 import {
@@ -63,6 +65,7 @@ export default function VistaPresupuestos({
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
   // Popup de edición rápida de fila y confirmación de eliminación
   const [modalEditItem, setModalEditItem] = useState(null);
@@ -111,6 +114,7 @@ export default function VistaPresupuestos({
       });
       setMonto('');
       setSubId('');
+      setMostrarFormulario(false);
       setMensaje('¡Tope de presupuesto guardado correctamente!');
       setTimeout(() => setMensaje(''), 3500);
       await cargar();
@@ -182,17 +186,20 @@ export default function VistaPresupuestos({
       <div className="panel-card">
         <div className="panel-card-header wrap-header">
           <div>
-            <h3>Control de Presupuesto ({data.periodo?.etiqueta || periodoClave})</h3>
-            <p>Define cuánto planean gastar en cada área y el semáforo te avisará si se acercan al límite</p>
+            <h3>Topes de Gasto ({data.periodo?.etiqueta || periodoClave})</h3>
+            <p>
+              Pon un límite máximo de gasto para no pasarte este mes.{' '}
+              <small style={{ color: '#64748b' }}>(Para juntar ahorros, usa la pestaña Metas).</small>
+            </p>
           </div>
           <button
             type="button"
-            className="btn-secondary-action"
-            onClick={handleCopiarAnterior}
-            disabled={loading}
+            className="btn-primary-inline"
+            onClick={() => setMostrarFormulario(!mostrarFormulario)}
           >
-            <Copy size={15} />
-            <span>Copiar del mes anterior</span>
+            <Plus size={15} />
+            <span>{mostrarFormulario ? 'Ocultar formulario' : 'Nuevo tope'}</span>
+            {mostrarFormulario ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
         </div>
 
@@ -209,52 +216,68 @@ export default function VistaPresupuestos({
           </div>
         )}
 
-        <form onSubmit={handleGuardar} className="budget-form-inline">
-          <div className="field-group">
-            <label>Área Familiar</label>
-            <select
-              value={catId}
-              onChange={(e) => {
-                setCatId(e.target.value);
-                setSubId('');
-              }}
-            >
-              {categoriasGasto.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {etiquetaCategoria(c.codigo)}
-                </option>
-              ))}
-            </select>
-          </div>
+        {mostrarFormulario && (
+          <div className="report-accordion-body">
+            <div style={{ marginBottom: '12px' }}>
+              <button
+                type="button"
+                className="btn-secondary-action"
+                onClick={handleCopiarAnterior}
+                disabled={loading}
+              >
+                <Copy size={15} />
+                <span>Copiar del mes anterior</span>
+              </button>
+            </div>
 
-          <div className="field-group">
-            <label>Rubro específico (opcional)</label>
-            <select value={subId} onChange={(e) => setSubId(e.target.value)}>
-              <option value="">— Toda el área completa —</option>
-              {subcategoriasDisp.map((s) => (
-                <option key={s.id} value={s.id}>{etiquetaSubcategoria(s.codigo)}</option>
-              ))}
-            </select>
-          </div>
+            <form onSubmit={handleGuardar} className="budget-form-inline">
+              <div className="field-group">
+                <label>Área Familiar</label>
+                <select
+                  value={catId}
+                  onChange={(e) => {
+                    setCatId(e.target.value);
+                    setSubId('');
+                  }}
+                >
+                  {categoriasGasto.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {etiquetaCategoria(c.codigo)}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="field-group">
-            <label>Tope Máximo Planeado (S/)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              placeholder="Ej. 2500.00"
-              value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-            />
-          </div>
+              <div className="field-group">
+                <label>Rubro específico (opcional)</label>
+                <select value={subId} onChange={(e) => setSubId(e.target.value)}>
+                  <option value="">— Toda el área completa —</option>
+                  {subcategoriasDisp.map((s) => (
+                    <option key={s.id} value={s.id}>{etiquetaSubcategoria(s.codigo)}</option>
+                  ))}
+                </select>
+              </div>
 
-          <button type="submit" className="btn-primary-inline" disabled={loading}>
-            <Plus size={16} />
-            <span>Guardar Tope</span>
-          </button>
-        </form>
+              <div className="field-group">
+                <label>Tope Máximo Planeado (S/)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="Ej. 2500.00"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                />
+              </div>
+
+              <button type="submit" className="btn-primary-inline" disabled={loading}>
+                <Plus size={16} />
+                <span>Guardar Tope</span>
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* Tabla de Presupuesto vs Gasto Real vs Disponible con Semáforo */}

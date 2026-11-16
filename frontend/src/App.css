@@ -5454,3 +5454,959 @@ input::-ms-clear {
 
 
 
+
+
+/* ============================================================
+   ICONOGRAFÍA PROFESIONAL (LUCIDE BADGES)
+   ============================================================ */
+.fc-icon-badge {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fc-icon-badge.sub {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 9px;
+}
+
+.tx-title-line,
+.tx-cat-inline,
+.tx-medio-tag,
+.legend-name-with-icon,
+.level-tab-btn,
+.medio-chip-btn,
+.sr-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ============================================================
+   WIZARD SECUENCIAL HORIZONTAL (ANOTAR MOVIMIENTO 1 -> 2 -> 3 -> 4)
+   ============================================================ */
+.wizard-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.wizard-horizontal-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wizard-horizontal-stepper::-webkit-scrollbar {
+  display: none;
+}
+
+.wizard-step-tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: #f8fafc;
+  color: #475569;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+  transition: all 0.18s ease;
+}
+
+.wizard-step-tab:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.wizard-step-tab:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.wizard-step-tab.active {
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.wizard-step-tab.completed {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.wizard-step-circle {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wizard-step-labels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wizard-step-title {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.wizard-step-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.wizard-step-connector {
+  color: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.wizard-stage-card {
+  padding: 20px;
+  overflow: hidden;
+}
+
+.wizard-step-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: wizardSlideIn 0.22s ease-out;
+}
+
+@keyframes wizardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.wizard-pane-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wizard-pane-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-top: 2px;
+}
+
+.wizard-pane-header p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.wizard-header-left-with-back {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wizard-step-kicker {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.btn-wizard-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+
+.btn-wizard-back:hover {
+  background: #e2e8f0;
+}
+
+.btn-wizard-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 700;
+  transition: opacity 0.15s;
+}
+
+.btn-wizard-next:hover {
+  opacity: 0.92;
+}
+
+.wizard-pane-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.wizard-card-arrow {
+  color: #94a3b8;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sh-pill.clickable {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.sh-pill.clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   TABLA DINÁMICA ESTILO EXCEL (ÁREA -> RUBRO -> CONCEPTO -> EDITAR)
+   ============================================================ */
+.pivot-card-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pivot-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pivot-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  color: var(--text-muted);
+}
+
+.pivot-search-wrap input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.pivot-expand-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pivot-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  transition: background 0.15s;
+}
+
+.pivot-tool-btn:hover {
+  background: #f1f5f9;
+}
+
+.pivot-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.pivot-excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.pivot-excel-table thead th {
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1.5px solid #cbd5e1;
+}
+
+.pivot-excel-table thead th.num-col,
+.pivot-excel-table td.num-col {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pivot-row {
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+}
+
+.pivot-row:hover {
+  background: #f8fafc;
+}
+
+.pivot-row td {
+  padding: 9px 14px;
+}
+
+.pivot-row.level-1 {
+  background: #f8fafc;
+}
+
+.pivot-row.level-1:hover {
+  background: #f1f5f9;
+}
+
+.pivot-row.level-2 {
+  background: #ffffff;
+}
+
+.pivot-row.level-3 {
+  background: #fcfcfd;
+  font-size: 13px;
+}
+
+.pivot-row.level-4-tx {
+  background: #f9fafb;
+  cursor: default;
+  font-size: 12.5px;
+}
+
+.pivot-cell-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pivot-cell-label.indent-1 {
+  padding-left: 20px;
+}
+
+.pivot-cell-label.indent-2 {
+  padding-left: 42px;
+}
+
+.pivot-tx-detail.indent-3 {
+  padding-left: 64px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #475569;
+}
+
+.pivot-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.pivot-area-name {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.pivot-rubro-name {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.pivot-concepto-name {
+  color: #334155;
+  font-weight: 500;
+}
+
+.pivot-concepto-name.muted {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.pivot-count-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.pivot-count-pill.subtle {
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.muted-num {
+  color: #475569;
+}
+
+.pivot-tx-date {
+  font-weight: 700;
+  color: #0f172a;
+  background: #e2e8f0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+}
+
+.pivot-tx-medio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: #475569;
+}
+
+.pivot-tx-obs {
+  font-style: italic;
+  color: #64748b;
+}
+
+.pivot-tx-right {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.pivot-tx-amt {
+  font-weight: 700;
+}
+
+.pivot-tx-amt.gasto {
+  color: #e11d48;
+}
+
+.pivot-tx-amt.ingreso {
+  color: #059669;
+}
+
+.pivot-tx-amt.ahorro {
+  color: #0284c7;
+}
+
+.pivot-tx-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pivot-grand-total-row td {
+  background: #ecfdf5;
+  color: #065f46;
+  padding: 12px 14px;
+  border-top: 2px solid #a7f3d0;
+  font-size: 14px;
+}
+
+.pivot-type-summary-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pts-pill {
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+.pts-pill.ingreso strong {
+  color: #059669;
+}
+
+.pts-pill.gasto strong {
+  color: #e11d48;
+}
+
+.pts-pill.ahorro strong {
+  color: #0284c7;
+}
+
+@media (max-width: 640px) {
+  .wizard-horizontal-stepper {
+    padding: 8px;
+    gap: 4px;
+  }
+
+  .wizard-step-tab {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .wizard-step-sub {
+    max-width: 64px;
+  }
+
+  .wizard-step-connector {
+    display: none;
+  }
+
+  .wizard-stage-card {
+    padding: 14px;
+  }
+
+  .pivot-cell-label.indent-1 {
+    padding-left: 12px;
+  }
+
+  .pivot-cell-label.indent-2 {
+    padding-left: 24px;
+  }
+
+  .pivot-tx-detail.indent-3 {
+    padding-left: 32px;
+  }
+}
+
+
+/* ============================================================
+   AJUSTES MÓVILES 360px + ALERTAS HOGAR EN TABLA DINÁMICA + ACORDEONES
+   ============================================================ */
+.wizard-shell,
+.wizard-stage-card,
+.wizard-step-pane {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.friendly-cat-card,
+.friendly-subcat-item-btn {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.friendly-cat-info,
+.friendly-sub-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.friendly-cat-info strong,
+.friendly-cat-info small,
+.friendly-sub-text strong,
+.friendly-sub-text small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Acordeones colapsables en Reportes */
+.report-accordion-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  padding: 4px 2px;
+}
+
+.rat-texts h3 {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.rat-texts small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.rat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.report-accordion-body {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* Alertas visuales y llenado rápido en Tabla Dinámica (Hogar y Familia) */
+.pivot-hogar-alert-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.pha-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.pha-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #d97706;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pha-btn:hover {
+  background: #b45309;
+}
+
+.pivot-pending-pill {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  white-space: nowrap;
+}
+
+.pivot-pending-pill.subtle {
+  font-weight: 700;
+}
+
+.pivot-pending-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #be123c;
+  white-space: nowrap;
+}
+
+.icon-pending-amber {
+  color: #d97706;
+}
+
+.pivot-row.is-pending-row {
+  background: #fffdf5;
+}
+
+.pivot-concepto-right {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pivot-quick-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.pivot-quick-add-btn.urgent {
+  background: #d97706;
+  color: #ffffff;
+  border-color: #d97706;
+}
+
+.pivot-row.level-4-quick td {
+  background: #f0fdf4;
+  padding: 10px 14px;
+  border-bottom: 1px solid #bbf7d0;
+}
+
+.pivot-quick-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pqf-label {
+  font-size: 12.5px;
+  color: #065f46;
+}
+
+.pqf-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pqf-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffffff;
+  border: 1.5px solid #059669;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-weight: 700;
+  color: #059669;
+}
+
+.pqf-input-wrap input {
+  width: 90px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pqf-select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  font-size: 12.5px;
+  color: #334155;
+  max-width: 170px;
+}
+
+.pqf-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #059669;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.pqf-btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+@media (max-width: 640px) {
+  .friendly-cats-grid,
+  .friendly-subcats-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .pivot-excel-table th,
+  .pivot-excel-table td {
+    padding: 8px 10px;
+    font-size: 12.5px;
+  }
+
+  .pivot-cell-label {
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .pivot-cell-label.indent-1 {
+    padding-left: 10px;
+  }
+
+  .pivot-cell-label.indent-2 {
+    padding-left: 18px;
+  }
+
+  .pivot-tx-detail.indent-3 {
+    padding-left: 24px;
+  }
+}
+
+
+/* ============================================================
+   DETALLE COLAPSABLE EN PASO 4 + STEPPER MÓVIL SIMÉTRICO
+   ============================================================ */
+.wizard-detail-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizard-detail-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  text-align: left;
+  transition: opacity 0.15s;
+}
+
+.wizard-detail-toggle:hover {
+  opacity: 0.92;
+}
+
+.wdt-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wdt-text {
+  font-size: 12.5px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wdt-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.wizard-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+@media (max-width: 640px) {
+  .wizard-horizontal-stepper {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+    overflow-x: visible;
+  }
+
+  .wizard-step-tab {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 7px 4px;
+    gap: 4px;
+  }
+
+  .wizard-step-title {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .wizard-step-sub {
+    display: none;
+  }
+
+  .wizard-step-connector {
+    display: none;
+  }
+}

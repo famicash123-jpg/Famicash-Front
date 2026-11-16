@@ -147,6 +147,16 @@ export const CATEGORIA_META = {
     alias: 'Gastos de Anthony',
     badge: 'Anthony'
   },
+  '0_AHORRO': {
+    nombre: 'Ahorros',
+    descripcion: 'Dinero guardado para metas',
+    emoji: '🐷',
+    color: '#0d9488',
+    bg: '#f0fdfa',
+    border: '#99f6e4',
+    alias: 'Ahorro Familiar',
+    badge: 'Ahorro'
+  },
   VI_AHORRO: {
     nombre: 'Ahorros',
     descripcion: 'Dinero guardado para metas',
@@ -227,11 +237,11 @@ export function nombreCategoria(codigo) {
   return CATEGORIA_META[codigo]?.nombre || humanizarCodigo(codigo);
 }
 
-/** Devuelve emoji + nombre amigable de Categoría (ej: "🏠 Hogar y Familia") */
+/** Devuelve nombre amigable de Categoría (ej: "Hogar y Familia") */
 export function etiquetaCategoria(codigo) {
   if (!codigo) return '';
   const m = CATEGORIA_META[codigo];
-  return m ? `${m.emoji} ${m.nombre}` : humanizarCodigo(codigo);
+  return m ? m.nombre : humanizarCodigo(codigo);
 }
 
 /** Devuelve el nombre amigable de una Subcategoría (ej: "Alimentación y Supermercado") */
@@ -240,29 +250,29 @@ export function nombreSubcategoria(codigo) {
   return SUBCATEGORIA_NOMBRES[codigo]?.nombre || humanizarCodigo(codigo);
 }
 
-/** Devuelve el emoji de una Subcategoría */
+/** Devuelve el emoji de una Subcategoría (solo respaldo) */
 export function emojiSubcategoria(codigo) {
-  return SUBCATEGORIA_NOMBRES[codigo]?.emoji || '📌';
+  return SUBCATEGORIA_NOMBRES[codigo]?.emoji || '';
 }
 
-/** Devuelve emoji + nombre amigable de Subcategoría (ej: "🍽️ Alimentación y Supermercado") */
+/** Devuelve nombre amigable de Subcategoría (ej: "Alimentación y Supermercado") */
 export function etiquetaSubcategoria(codigo) {
   if (!codigo) return '';
   const info = SUBCATEGORIA_NOMBRES[codigo];
-  return info ? `${info.emoji} ${info.nombre}` : `📌 ${humanizarCodigo(codigo)}`;
+  return info ? info.nombre : humanizarCodigo(codigo);
 }
 
 /** Nombre amigable para medios de pago largos */
 export function nombreMedioPago(nombre = '') {
   const map = {
-    'TC PERSONAL VANESSA': '💳 Tarjeta Vanessa',
-    'YAPE/PLIN/TRANSFERENCIA VANESSA': '📱 Yape / Plin Vanessa',
-    'TC PERSONAL ANTHONY': '💳 Tarjeta Anthony',
-    'YAPE/PLIN/TRANSFERENCIA ANTHONY': '📱 Yape / Plin Anthony',
-    'CUENTA BCP': '🏦 Cuenta BCP',
-    'EFECTIVO': '💵 Efectivo'
+    'TC PERSONAL VANESSA': 'Tarjeta Vanessa',
+    'YAPE/PLIN/TRANSFERENCIA VANESSA': 'Yape / Plin Vanessa',
+    'TC PERSONAL ANTHONY': 'Tarjeta Anthony',
+    'YAPE/PLIN/TRANSFERENCIA ANTHONY': 'Yape / Plin Anthony',
+    'CUENTA BCP': 'Cuenta BCP',
+    'EFECTIVO': 'Efectivo'
   };
-  return map[nombre] || `💳 ${humanizarCodigo(nombre)}`;
+  return map[nombre] || humanizarCodigo(nombre);
 }
 
 export const PALETA_DONA = ['#0284c7', '#db2777', '#7c3aed', '#d97706', '#059669', '#0d9488', '#6366f1'];

@@ -16,12 +16,17 @@ import {
 } from 'recharts';
 import {
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ArrowLeft,
   Pencil,
   Trash2,
   BarChart3,
   Layers,
-  ListFilter
+  ListFilter,
+  Home,
+  UtensilsCrossed,
+  Tag
 } from 'lucide-react';
 import { api } from '../api';
 import {
@@ -33,9 +38,10 @@ import {
   etiquetaCategoria,
   nombreSubcategoria,
   etiquetaSubcategoria,
-  emojiSubcategoria,
   nombreMedioPago
 } from '../utils/format';
+import TablaDinamica from './TablaDinamica';
+import { CategoriaIcon, SubcategoriaIcon, MedioPagoIcon } from './IconoFamicash';
 
 function formatearNombreNivel(nivel, codigoONombre) {
   if (!codigoONombre) return '';
@@ -45,6 +51,8 @@ function formatearNombreNivel(nivel, codigoONombre) {
 }
 
 export default function VistaReportes({
+  taxonomia = [],
+  mediosPago = [],
   periodoTipo,
   periodoClave,
   filtros,
@@ -53,8 +61,13 @@ export default function VistaReportes({
   onClearDrillInicial,
   onEditTransaccion,
   onDeleteTransaccion,
+  onQuickAddTransaccion,
   refreshKey
 }) {
+  // Por defecto la Tabla Dinámica predomina arriba y los demás gráficos salen colapsados
+  const [mostrarEvolucion, setMostrarEvolucion] = useState(false);
+  const [mostrarRankingHistorial, setMostrarRankingHistorial] = useState(Boolean(drillInicial));
+
   const [rangoEvolutivo, setRangoEvolutivo] = useState('6M');
   const [anioEvolutivo, setAnioEvolutivo] = useState(new Date().getFullYear());
   const [desdeMes, setDesdeMes] = useState(`${new Date().getFullYear()}-01`);
@@ -80,6 +93,7 @@ export default function VistaReportes({
 
   useEffect(() => {
     if (drillInicial) {
+      setMostrarRankingHistorial(true);
       setDrill({
         nivel: 'categoria',
         id: drillInicial.categoriaId,
@@ -119,7 +133,7 @@ export default function VistaReportes({
         ...filtros,
         desde: resNivel?.periodo?.desde,
         hasta: resNivel?.periodo?.hasta,
-        limite: 200
+        limite: 500
       });
       setTxFiltradas(resTx);
     } catch (err) {
@@ -172,19 +186,48 @@ export default function VistaReportes({
   return (
     <div className="reports-view-container">
       {/* ============================================================
-          SECCIÓN 6.2: EVOLUCIÓN MENSUAL EN BARRAS NUMERADAS
+          1. TABLA DINÁMICA ESTILO EXCEL (PREDOMINANTE ARRIBA)
           ============================================================ */}
       <div className="panel-card">
-        <div className="panel-card-header wrap-header">
-          <div>
-            <div className="section-title-with-icon">
-              <BarChart3 size={20} className="icon-forest" />
-              <h3>Evolución Mes a Mes (Ingresos vs. Gastos vs. Ahorros)</h3>
-            </div>
-            <p>Compara cómo se movió el dinero de la familia cada mes</p>
-          </div>
+        <TablaDinamica
+          transacciones={txFiltradas.items || []}
+          taxonomia={taxonomia}
+          mediosPago={mediosPago}
+          periodoEtiqueta={porNivel?.periodo?.etiqueta}
+          onEditTransaccion={onEditTransaccion}
+          onDeleteTransaccion={(txOrId) =>
+            onDeleteTransaccion(typeof txOrId === 'object' ? txOrId.id : txOrId)
+          }
+          onQuickAddTransaccion={onQuickAddTransaccion}
+        />
+      </div>
 
-          <div className="evo-controls-row">
+      {/* ============================================================
+          2. EVOLUCIÓN MENSUAL EN BARRAS (COLAPSADA POR DEFECTO)
+          ============================================================ */}
+      <div className="panel-card">
+        <button
+          type="button"
+          className="report-accordion-toggle"
+          onClick={() => setMostrarEvolucion(!mostrarEvolucion)}
+        >
+          <div className="section-title-with-icon">
+            <BarChart3 size={20} className="icon-forest" />
+            <div className="rat-texts">
+              <h3>Evolución Mes a Mes (Gráfico de barras)</h3>
+              <small>Compara ingresos, gastos y ahorros por mes</small>
+            </div>
+          </div>
+          <span className="rat-pill">
+            <span>{mostrarEvolucion ? 'Ocultar' : 'Ver gráfico'}</span>
+            {mostrarEvolucion ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </button>
+
+        {mostrarEvolucion && (
+          <div className="report-accordion-body">
+            <div className="panel-card-header wrap-header">
+              <div className="evo-controls-row">
             <div className="segmented-pills">
               <button
                 type="button"
@@ -329,11 +372,34 @@ export default function VistaReportes({
             </BarChart>
           </ResponsiveContainer>
         </div>
+          </div>
+        )}
       </div>
 
       {/* ============================================================
-          SECCIÓN 6.4 y 6.5: DESGLOSE POR ÁREA / RUBRO / CONCEPTO + DRILL-DOWN
+          3. RANKING E HISTORIAL DETALLADO (COLAPSADO POR DEFECTO)
           ============================================================ */}
+      <div className="panel-card">
+        <button
+          type="button"
+          className="report-accordion-toggle"
+          onClick={() => setMostrarRankingHistorial(!mostrarRankingHistorial)}
+        >
+          <div className="section-title-with-icon">
+            <Layers size={19} className="icon-forest" />
+            <div className="rat-texts">
+              <h3>Ranking por Área y Lista de Movimientos ({txFiltradas.total || 0})</h3>
+              <small>Desglose con barras de porcentaje e historial completo</small>
+            </div>
+          </div>
+          <span className="rat-pill">
+            <span>{mostrarRankingHistorial ? 'Ocultar' : 'Ver detalle'}</span>
+            {mostrarRankingHistorial ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </button>
+      </div>
+
+      {mostrarRankingHistorial && (
       <div className="reports-two-cols">
         <div className="panel-card">
           {!drill ? (
@@ -365,19 +431,23 @@ export default function VistaReportes({
 
               <div className="level-tabs-bar">
                 {[
-                  { id: 'categoria', label: '🏠 Por Área Familiar' },
-                  { id: 'subcategoria', label: '🍽️ Por Rubro' },
-                  { id: 'detalle', label: '🏷️ Por Concepto' }
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    className={`level-tab-btn ${nivelVista === tab.id ? 'active' : ''}`}
-                    onClick={() => setNivelVista(tab.id)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+                  { id: 'categoria', label: 'Por Área Familiar', Icon: Home },
+                  { id: 'subcategoria', label: 'Por Rubro', Icon: UtensilsCrossed },
+                  { id: 'detalle', label: 'Por Concepto', Icon: Tag }
+                ].map((tab) => {
+                  const TabIcon = tab.Icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`level-tab-btn ${nivelVista === tab.id ? 'active' : ''}`}
+                      onClick={() => setNivelVista(tab.id)}
+                    >
+                      <TabIcon size={14} />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               {porNivel.items?.length === 0 ? (
@@ -560,17 +630,22 @@ export default function VistaReportes({
                       <div className="tx-badge-cat">{formatFechaCorta(tx.fecha)}</div>
                       <div className="tx-main-info">
                         <div className="tx-title-line">
-                          <strong>
-                            {emojiSubcategoria(tx.subcategoria)}{' '}
-                            {tx.detalle || nombreSubcategoria(tx.subcategoria)}
-                          </strong>
+                          <SubcategoriaIcon
+                            codigo={tx.subcategoria}
+                            categoriaCodigo={tx.categoria}
+                            size={14}
+                          />
+                          <strong>{tx.detalle || nombreSubcategoria(tx.subcategoria)}</strong>
                         </div>
                         <div className="tx-sub-line">
                           <span>{nombreSubcategoria(tx.subcategoria)}</span>
                           {tx.medioPago && (
                             <>
                               <span>·</span>
-                              <span className="tx-medio-tag">{nombreMedioPago(tx.medioPago)}</span>
+                              <span className="tx-medio-tag">
+                                <MedioPagoIcon nombre={tx.medioPago} size={12} />
+                                {nombreMedioPago(tx.medioPago)}
+                              </span>
                             </>
                           )}
                         </div>
@@ -639,20 +714,28 @@ export default function VistaReportes({
                     </div>
                     <div className="tx-main-info">
                       <div className="tx-title-line">
-                        <strong>
-                          {emojiSubcategoria(tx.subcategoria)}{' '}
-                          {tx.detalle || nombreSubcategoria(tx.subcategoria)}
-                        </strong>
+                        <SubcategoriaIcon
+                          codigo={tx.subcategoria}
+                          categoriaCodigo={tx.categoria}
+                          size={15}
+                        />
+                        <strong>{tx.detalle || nombreSubcategoria(tx.subcategoria)}</strong>
                         <span className="tx-person-tag">{tx.persona}</span>
                       </div>
                       <div className="tx-sub-line">
-                        <span>{meta.emoji} {nombreCategoria(tx.categoria)}</span>
+                        <span className="tx-cat-inline">
+                          <CategoriaIcon codigo={tx.categoria} size={13} />
+                          {nombreCategoria(tx.categoria)}
+                        </span>
                         <span>›</span>
                         <span>{nombreSubcategoria(tx.subcategoria)}</span>
                         {tx.medioPago && (
                           <>
                             <span>·</span>
-                            <span className="tx-medio-tag">{nombreMedioPago(tx.medioPago)}</span>
+                            <span className="tx-medio-tag">
+                              <MedioPagoIcon nombre={tx.medioPago} size={12} />
+                              {nombreMedioPago(tx.medioPago)}
+                            </span>
                           </>
                         )}
                       </div>
@@ -689,6 +772,7 @@ export default function VistaReportes({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

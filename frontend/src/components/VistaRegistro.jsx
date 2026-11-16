@@ -1,12 +1,9 @@
 // ============================================================
-// Vista de Registro Simple y Ordenado en Cascada:
-//  🔍 Buscador instantáneo de cualquier Rubro o Concepto (incluyendo nuevos)
-//  1️⃣ Paso 1: Escoge el Área Familiar (con botón + Nueva Área)
-//  2️⃣ Paso 2: Escoge el Rubro de esa Área (con botón + Nuevo Rubro)
-//  3️⃣ Paso 3: Escoge el Concepto de ese Rubro (con botón + Nuevo Concepto)
-//  4️⃣ Paso 4: ¿Con qué pagaste y cuándo?
-//  5️⃣ Paso 5: Monto en Soles (S/) + Confirmar
-// Cada sección se puede colapsar o desplegar a voluntad.
+// Vista de Registro Secuencial Horizontal (Wizard 1 -> 2 -> 3 -> 4)
+//  - Barra de pasos horizontal para avanzar o regresar a cualquier paso
+//  - Muestra un solo paso a la vez para evitar saturación visual
+//  - Buscador instantáneo para saltar directo al monto
+//  - Iconografía profesional con Lucide (sin emojis sueltos)
 // ============================================================
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
@@ -16,14 +13,14 @@ import {
   Plus,
   Sparkles,
   X,
-  ChevronDown,
-  ChevronUp,
   AlertCircle,
   Search,
-  Folder,
-  FolderOpen,
-  FileText,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Keyboard
 } from 'lucide-react';
 import { api } from '../api';
 import {
@@ -32,9 +29,14 @@ import {
   formatSoles,
   nombreCategoria,
   nombreSubcategoria,
-  emojiSubcategoria,
   nombreMedioPago
 } from '../utils/format';
+import {
+  CategoriaIcon,
+  SubcategoriaIcon,
+  MedioPagoIcon,
+  ConceptoIcon
+} from './IconoFamicash';
 
 export default function VistaRegistro({
   taxonomia = [],
@@ -46,6 +48,7 @@ export default function VistaRegistro({
   onQuickCreateDetalle,
   onRefreshCatalogos
 }) {
+  const [pasoActual, setPasoActual] = useState(1); // 1: Área, 2: Rubro, 3: Concepto, 4: Monto y Pago
   const [categoriaId, setCategoriaId] = useState(null);
   const [subcategoriaId, setSubcategoriaId] = useState(null);
   const [detalleId, setDetalleId] = useState(null);
@@ -58,15 +61,9 @@ export default function VistaRegistro({
 
   // Buscador global de rubros y conceptos
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
-  // Filtro interno dentro de la lista de rubros o conceptos si hay muchos
   const [filtroRubro, setFiltroRubro] = useState('');
 
-  // Secciones colapsables a voluntad del usuario
-  const [paso1Abierto, setPaso1Abierto] = useState(true);
-  const [paso2Abierto, setPaso2Abierto] = useState(true);
-  const [paso3Abierto, setPaso3Abierto] = useState(true);
-
-  // Creación rápida sin salir de la pantalla (Área, Rubro, Concepto)
+  // Creación rápida sin salir del paso
   const [creandoArea, setCreandoArea] = useState(false);
   const [nuevaAreaNombre, setNuevaAreaNombre] = useState('');
   const [nuevaAreaTipo, setNuevaAreaTipo] = useState('GASTO');
@@ -81,6 +78,8 @@ export default function VistaRegistro({
   const [mensajeExito, setMensajeExito] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [mostrarTeclado, setMostrarTeclado] = useState(false);
+  const [detalleExpandido, setDetalleExpandido] = useState(false);
+  const [medioPagoConfirmado, setMedioPagoConfirmado] = useState(false);
 
   const montoInputRef = useRef(null);
 
@@ -95,6 +94,8 @@ export default function VistaRegistro({
       setClase(editandoTx.clase || 'Cotidiano');
       setObservaciones(editandoTx.observaciones || '');
       setFecha(editandoTx.fecha || hoyISO());
+      setMedioPagoConfirmado(true);
+      setPasoActual(4);
       return;
     }
 
@@ -106,6 +107,7 @@ export default function VistaRegistro({
           const sub = cat.subcategorias?.[0];
           setSubcategoriaId(sub?.id || null);
           setDetalleId(sub?.detalles?.[0]?.id || null);
+          setPasoActual(2);
           return;
         }
       }
@@ -118,6 +120,7 @@ export default function VistaRegistro({
           setCategoriaId(cat.id);
           setSubcategoriaId(sub.id);
           setDetalleId(sub.detalles?.[0]?.id || null);
+          setPasoActual(4);
           return;
         }
       }
@@ -142,6 +145,14 @@ export default function VistaRegistro({
     }
   }, [mediosPago, medioPagoId]);
 
+  useEffect(() => {
+    if (pasoActual === 4) {
+      setTimeout(() => {
+        montoInputRef.current?.focus();
+      }, 120);
+    }
+  }, [pasoActual]);
+
   const categoriaActual = taxonomia.find((c) => c.id === categoriaId) || taxonomia[0];
   const subcategorias = categoriaActual?.subcategorias || [];
   const subcategoriaActual =
@@ -149,7 +160,7 @@ export default function VistaRegistro({
   const detalles = subcategoriaActual?.detalles || [];
   const detalleActual = detalles.find((d) => d.id === detalleId) || null;
 
-  // Índice plano para el Buscador Instantáneo (encuentra cualquier área, rubro o concepto, incluso los recién creados)
+  // Índice plano para el Buscador Instantáneo
   const resultadosBusqueda = useMemo(() => {
     const q = busquedaGlobal.trim().toLowerCase();
     if (!q) return [];
@@ -160,7 +171,6 @@ export default function VistaRegistro({
       const catNombre = meta.nombre;
       for (const sub of cat.subcategorias || []) {
         const subNombre = nombreSubcategoria(sub.codigo);
-        const subEmoji = emojiSubcategoria(sub.codigo);
         const matchSub =
           subNombre.toLowerCase().includes(q) ||
           sub.codigo.toLowerCase().includes(q) ||
@@ -174,9 +184,8 @@ export default function VistaRegistro({
             sub,
             det: sub.detalles?.[0] || null,
             meta,
-            subEmoji,
             titulo: subNombre,
-            ruta: `${meta.emoji} ${catNombre} ➔ ${subEmoji} ${subNombre}`
+            ruta: `${catNombre} › ${subNombre}`
           });
         }
 
@@ -189,9 +198,8 @@ export default function VistaRegistro({
               sub,
               det,
               meta,
-              subEmoji,
               titulo: det.nombre,
-              ruta: `${meta.emoji} ${catNombre} ➔ ${subEmoji} ${subNombre} ➔ 📄 ${det.nombre}`
+              ruta: `${catNombre} › ${subNombre} › ${det.nombre}`
             });
           }
         }
@@ -206,14 +214,22 @@ export default function VistaRegistro({
     setSubcategoriaId(primeraSub?.id || null);
     setDetalleId(primeraSub?.detalles?.[0]?.id || null);
     setFiltroRubro('');
-    setPaso2Abierto(true);
-    setPaso3Abierto(true);
+    setErrorMsg('');
+    setPasoActual(2);
   };
 
   const seleccionarSubcategoria = (sub) => {
     setSubcategoriaId(sub.id);
-    setDetalleId(sub.detalles?.[0]?.id || null);
-    setPaso3Abierto(true);
+    setDetalleId(null);
+    setErrorMsg('');
+    setPasoActual(3);
+  };
+
+  const seleccionarDetalle = (det) => {
+    setDetalleId(det.id);
+    setErrorMsg('');
+    setMedioPagoConfirmado(false);
+    setPasoActual(4);
   };
 
   const aplicarResultadoBusqueda = (r) => {
@@ -221,9 +237,9 @@ export default function VistaRegistro({
     setSubcategoriaId(r.sub.id);
     setDetalleId(r.det?.id || null);
     setBusquedaGlobal('');
-    if (montoInputRef.current) {
-      montoInputRef.current.focus();
-    }
+    setErrorMsg('');
+    setMedioPagoConfirmado(false);
+    setPasoActual(4);
   };
 
   // Crear nueva Área Familiar desde el Paso 1
@@ -240,10 +256,11 @@ export default function VistaRegistro({
         setCategoriaId(creada.id);
         setSubcategoriaId(null);
         setDetalleId(null);
+        setPasoActual(2);
+        setCreandoRubro(true);
       }
       setNuevaAreaNombre('');
       setCreandoArea(false);
-      setCreandoRubro(true);
     } catch (err) {
       setErrorMsg(err.message || 'No se pudo crear el área');
     }
@@ -275,7 +292,9 @@ export default function VistaRegistro({
     if (!nuevoDetalleTexto.trim() || !subcategoriaActual) return;
     try {
       const creado = await onQuickCreateDetalle(subcategoriaActual.id, nuevoDetalleTexto.trim());
-      if (creado?.id) setDetalleId(creado.id);
+      if (creado?.id) {
+        setDetalleId(creado.id);
+      }
       setNuevoDetalleTexto('');
       setCreandoDetalle(false);
     } catch (err) {
@@ -325,16 +344,14 @@ export default function VistaRegistro({
     const montoNum = parseFloat(limpio);
 
     if (!subcategoriaActual) {
-      setErrorMsg('Este área aún no tiene un rubro seleccionado. Elige o crea un rubro en el Paso 2.');
+      setErrorMsg('Esta área aún no tiene un rubro seleccionado. Elige o crea un rubro en el Paso 2.');
+      setPasoActual(2);
       return;
     }
 
     if (!Number.isFinite(montoNum) || montoNum <= 0) {
       setErrorMsg('Falta escribir cuánto fue el monto en Soles (S/).');
-      if (montoInputRef.current) {
-        montoInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        montoInputRef.current.focus();
-      }
+      montoInputRef.current?.focus();
       return;
     }
 
@@ -356,9 +373,10 @@ export default function VistaRegistro({
       setObservaciones('');
       setMensajeExito(
         editandoTx
-          ? '¡Movimiento actualizado correctamente!'
-          : `¡Guardado! Se anotó ${formatSoles(montoNum)} en ${nombreCategoria(categoriaActual?.codigo)} ➔ ${nombreSubcategoria(subcategoriaActual.codigo)}`
+          ? 'Movimiento actualizado correctamente.'
+          : `Guardado: ${formatSoles(montoNum)} en ${nombreCategoria(categoriaActual?.codigo)} › ${nombreSubcategoria(subcategoriaActual.codigo)}`
       );
+      setPasoActual(1);
       setTimeout(() => setMensajeExito(''), 4500);
     } catch (err) {
       setErrorMsg(err.message || 'Error al guardar el movimiento');
@@ -381,8 +399,31 @@ export default function VistaRegistro({
         nombreSubcategoria(s.codigo).toLowerCase().includes(filtroRubro.trim().toLowerCase())
       );
 
+  const pasosWizard = [
+    {
+      num: 1,
+      titulo: 'Área',
+      subtitulo: categoriaActual ? metaCat.nombre : 'Elegir'
+    },
+    {
+      num: 2,
+      titulo: 'Rubro',
+      subtitulo: subcategoriaActual ? nombreSubcategoria(subcategoriaActual.codigo) : 'Elegir'
+    },
+    {
+      num: 3,
+      titulo: 'Concepto',
+      subtitulo: detalleActual ? detalleActual.nombre : 'Opcional'
+    },
+    {
+      num: 4,
+      titulo: 'Monto',
+      subtitulo: montoStr ? formatSoles(String(montoStr).replace(',', '.')) : 'Registrar'
+    }
+  ];
+
   return (
-    <div className="pocket-register-shell">
+    <div className="pocket-register-shell wizard-shell">
       {editandoTx && (
         <div className="editing-banner">
           <div>
@@ -395,15 +436,20 @@ export default function VistaRegistro({
         </div>
       )}
 
-      {/* ============================================================
-          BUSCADOR INSTANTÁNEO GLOBAL (ENCUENTRA CUALQUIER RUBRO O CONCEPTO)
-          ============================================================ */}
+      {mensajeExito && (
+        <div className="toast-success-inline inline-feedback">
+          <Check size={18} />
+          <span>{mensajeExito}</span>
+        </div>
+      )}
+
+      {/* BUSCADOR INSTANTÁNEO GLOBAL */}
       <div className="register-instant-search-card">
         <div className="register-search-input-wrap">
           <Search size={18} className="search-icon-emerald" />
           <input
             type="text"
-            placeholder="¿Buscas rápido un rubro o concepto? Escribe aquí (ej. Luz, Sueldo, Gasolina o cualquier rubro nuevo)..."
+            placeholder="¿Buscas rápido un rubro o concepto? (ej. Luz, Sueldo, Gasolina)..."
             value={busquedaGlobal}
             onChange={(e) => setBusquedaGlobal(e.target.value)}
           />
@@ -422,7 +468,7 @@ export default function VistaRegistro({
           <div className="register-search-results">
             {resultadosBusqueda.length === 0 ? (
               <div className="search-empty-msg">
-                No se encontró "{busquedaGlobal}". Puedes crearlo abajo en el Paso 2 (Rubro) o Paso 3 (Concepto).
+                No se encontró "{busquedaGlobal}". Puedes crearlo en el Paso 2 (Rubro) o Paso 3 (Concepto).
               </div>
             ) : (
               resultadosBusqueda.map((r) => (
@@ -439,7 +485,9 @@ export default function VistaRegistro({
                     <strong>{r.titulo}</strong>
                     <small>{r.ruta}</small>
                   </div>
-                  <span className="sr-select-label">Elegir ➔</span>
+                  <span className="sr-select-label">
+                    Ir al monto <ArrowRight size={13} />
+                  </span>
                 </button>
               ))
             )}
@@ -448,536 +496,618 @@ export default function VistaRegistro({
       </div>
 
       {/* ============================================================
-          DISPOSICIÓN CLARA EN 2 PANELES (PC) / CASCADA VERTICAL (MÓVIL):
-          Izquierda: Pasos 1, 2 y 3 (Área Familiar ➔ Rubro ➔ Concepto)
-          Derecha: Resumen seleccionado + Paso 4 (Medio de pago) + Paso 5 (Monto S/)
+          STEPPER HORIZONTAL (1. Área -> 2. Rubro -> 3. Concepto -> 4. Monto)
           ============================================================ */}
-      <div className="register-two-columns">
-        {/* COLUMNA IZQUIERDA: SELECCIÓN ORDENADA 1 ➔ 2 ➔ 3 */}
-        <div className="register-col-steps">
-          {/* ==========================================
-              PASO 1: ÁREA FAMILIAR (CATEGORÍA)
-              ========================================== */}
-          <section className="pocket-card collapsible-step-card">
-            <div
-              className="step-collapsible-header"
-              onClick={() => setPaso1Abierto(!paso1Abierto)}
-            >
-              <div className="step-header-left">
-                <span className="step-num" style={{ background: metaCat.color }}>1</span>
-                <div>
-                  <h3>Escoge el Área Familiar</h3>
-                  <small className="step-selected-preview">
-                    Seleccionado: <strong>{metaCat.emoji} {metaCat.nombre}</strong> ({taxonomia.length} áreas disponibles)
+      <nav className="wizard-horizontal-stepper" aria-label="Pasos para registrar movimiento">
+        {pasosWizard.map((p, idx) => {
+          const isActive = pasoActual === p.num;
+          const isCompleted = pasoActual > p.num;
+          const isReachable =
+            p.num === 1 ||
+            (p.num === 2 && Boolean(categoriaActual)) ||
+            (p.num === 3 && Boolean(subcategoriaActual)) ||
+            (p.num === 4 && Boolean(subcategoriaActual));
+
+          return (
+            <React.Fragment key={p.num}>
+              <button
+                type="button"
+                className={`wizard-step-tab ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                disabled={!isReachable}
+                onClick={() => isReachable && setPasoActual(p.num)}
+                style={
+                  isActive
+                    ? { borderColor: metaCat.color, background: metaCat.bg }
+                    : undefined
+                }
+              >
+                <span
+                  className="wizard-step-circle"
+                  style={
+                    isActive || isCompleted
+                      ? { background: metaCat.color, color: '#ffffff' }
+                      : undefined
+                  }
+                >
+                  {isCompleted ? <Check size={14} strokeWidth={2.5} /> : p.num}
+                </span>
+                <div className="wizard-step-labels">
+                  <span className="wizard-step-title">{p.titulo}</span>
+                  <small className="wizard-step-sub" title={p.subtitulo}>
+                    {p.subtitulo}
                   </small>
                 </div>
-              </div>
+              </button>
+              {idx < pasosWizard.length - 1 && (
+                <ChevronRight size={16} className="wizard-step-connector" />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </nav>
 
-              <div className="step-header-right" onClick={(e) => e.stopPropagation()}>
+      {/* ============================================================
+          CONTENEDOR DE UN SOLO PASO A LA VEZ (TRANSICIÓN HORIZONTAL)
+          ============================================================ */}
+      <div className="wizard-stage-card pocket-card" key={`step-${pasoActual}`}>
+        {/* PASO 1: ÁREA FAMILIAR */}
+        {pasoActual === 1 && (
+          <div className="wizard-step-pane">
+            <div className="wizard-pane-header">
+              <div>
+                <span className="wizard-step-kicker" style={{ color: metaCat.color }}>
+                  Paso 1 de 4
+                </span>
+                <h3>Escoge el Área Familiar</h3>
+                <p>Selecciona a quién o a qué grupo pertenece este movimiento.</p>
+              </div>
+              <button
+                type="button"
+                className="btn-mini-add"
+                onClick={() => setCreandoArea(!creandoArea)}
+              >
+                <Plus size={14} /> Nueva Área
+              </button>
+            </div>
+
+            {creandoArea && (
+              <div className="inline-add-detalle">
+                <input
+                  type="text"
+                  placeholder="Nombre de la nueva área (ej. Mascotas, Negocio)..."
+                  value={nuevaAreaNombre}
+                  onChange={(e) => setNuevaAreaNombre(e.target.value)}
+                />
+                <select
+                  value={nuevaAreaTipo}
+                  onChange={(e) => setNuevaAreaTipo(e.target.value)}
+                  className="inline-select-mini"
+                >
+                  <option value="GASTO">Gasto</option>
+                  <option value="INGRESO">Ingreso</option>
+                  <option value="AHORRO">Ahorro</option>
+                </select>
+                <button type="button" className="btn-save-mini" onClick={handleCrearAreaRapida}>
+                  Crear Área
+                </button>
+              </div>
+            )}
+
+            <div className="friendly-cats-grid">
+              {taxonomia.map((cat) => {
+                const isSelected = cat.id === categoriaActual?.id;
+                const m = getMetaCategoria(cat.codigo);
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`friendly-cat-card ${isSelected ? 'selected' : ''}`}
+                    style={
+                      isSelected
+                        ? { borderColor: m.color, background: m.bg, boxShadow: `0 0 0 2px ${m.color}` }
+                        : {}
+                    }
+                    onClick={() => seleccionarCategoria(cat)}
+                  >
+                    <CategoriaIcon codigo={cat.codigo} size={20} withBadge />
+                    <div className="friendly-cat-info">
+                      <strong>{m.nombre}</strong>
+                      <small>
+                        {cat.subcategorias?.length || 0} rubros ·{' '}
+                        {cat.tipo === 'INGRESO' ? 'Ingreso' : cat.tipo === 'AHORRO' ? 'Ahorro' : 'Gasto'}
+                      </small>
+                    </div>
+                    <ChevronRight size={16} className="wizard-card-arrow" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PASO 2: RUBRO DENTRO DEL ÁREA */}
+        {pasoActual === 2 && (
+          <div className="wizard-step-pane">
+            <div className="wizard-pane-header">
+              <div className="wizard-header-left-with-back">
+                <button
+                  type="button"
+                  className="btn-wizard-back"
+                  onClick={() => setPasoActual(1)}
+                >
+                  <ArrowLeft size={16} />
+                  <span>Área</span>
+                </button>
+                <div>
+                  <span className="wizard-step-kicker" style={{ color: metaCat.color }}>
+                    Paso 2 de 4 · {metaCat.nombre}
+                  </span>
+                  <h3>Escoge el Rubro</h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-mini-add"
+                onClick={() => setCreandoRubro(!creandoRubro)}
+              >
+                <Plus size={14} /> Nuevo Rubro
+              </button>
+            </div>
+
+            {creandoRubro && (
+              <div className="inline-add-detalle">
+                <input
+                  type="text"
+                  placeholder={`Nuevo rubro dentro de ${metaCat.nombre}...`}
+                  value={nuevoRubroTexto}
+                  onChange={(e) => setNuevoRubroTexto(e.target.value)}
+                />
+                <button type="button" className="btn-save-mini" onClick={handleCrearRubroRapido}>
+                  Guardar Rubro
+                </button>
+              </div>
+            )}
+
+            {subcategorias.length > 5 && (
+              <div className="mini-filter-input">
+                <Search size={14} />
+                <input
+                  type="text"
+                  placeholder={`Filtrar rubros de ${metaCat.nombre}...`}
+                  value={filtroRubro}
+                  onChange={(e) => setFiltroRubro(e.target.value)}
+                />
+                {filtroRubro && (
+                  <button type="button" onClick={() => setFiltroRubro('')}>
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {subcategoriasFiltradas.length === 0 ? (
+              <div className="empty-state-box">
+                No hay rubros en esta área todavía. Pulsa <strong>+ Nuevo Rubro</strong> arriba para crear el primero.
+              </div>
+            ) : (
+              <div className="friendly-subcats-grid">
+                {subcategoriasFiltradas.map((sub) => {
+                  const isSelected = sub.id === subcategoriaActual?.id;
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      className={`friendly-subcat-item-btn ${isSelected ? 'selected' : ''}`}
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: metaCat.color,
+                              background: metaCat.bg,
+                              boxShadow: `0 0 0 2px ${metaCat.color}`
+                            }
+                          : {}
+                      }
+                      onClick={() => seleccionarSubcategoria(sub)}
+                    >
+                      <SubcategoriaIcon
+                        codigo={sub.codigo}
+                        categoriaCodigo={categoriaActual?.codigo}
+                        size={17}
+                        withBadge
+                      />
+                      <div className="friendly-sub-text">
+                        <strong>{nombreSubcategoria(sub.codigo)}</strong>
+                        <small>{sub.detalles?.length || 0} conceptos</small>
+                      </div>
+                      <ChevronRight size={16} className="wizard-card-arrow" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* PASO 3: CONCEPTO ESPECÍFICO */}
+        {pasoActual === 3 && (
+          <div className="wizard-step-pane">
+            <div className="wizard-pane-header">
+              <div className="wizard-header-left-with-back">
+                <button
+                  type="button"
+                  className="btn-wizard-back"
+                  onClick={() => setPasoActual(2)}
+                >
+                  <ArrowLeft size={16} />
+                  <span>Rubro</span>
+                </button>
+                <div>
+                  <span className="wizard-step-kicker" style={{ color: metaCat.color }}>
+                    Paso 3 de 4 · {subcategoriaActual ? nombreSubcategoria(subcategoriaActual.codigo) : '—'}
+                  </span>
+                  <h3>Escoge el Concepto</h3>
+                </div>
+              </div>
+              {subcategoriaActual && (
                 <button
                   type="button"
                   className="btn-mini-add"
-                  onClick={() => {
-                    setPaso1Abierto(true);
-                    setCreandoArea(!creandoArea);
-                  }}
+                  onClick={() => setCreandoDetalle(!creandoDetalle)}
                 >
-                  <Plus size={13} /> Nueva Área
+                  <Plus size={14} /> Nuevo Concepto
                 </button>
+              )}
+            </div>
+
+            {creandoDetalle && (
+              <div className="inline-add-detalle">
+                <input
+                  type="text"
+                  placeholder="Escribe el nuevo concepto (ej. Frutería, Movilidad)..."
+                  value={nuevoDetalleTexto}
+                  onChange={(e) => setNuevoDetalleTexto(e.target.value)}
+                />
+                <button type="button" className="btn-save-mini" onClick={handleAgregarDetalle}>
+                  Guardar Concepto
+                </button>
+              </div>
+            )}
+
+            {!subcategoriaActual ? (
+              <div className="empty-state-box">
+                Primero selecciona o crea un Rubro en el Paso 2.
+              </div>
+            ) : detalles.length === 0 ? (
+              <div className="empty-state-box">
+                Este rubro aún no tiene conceptos específicos. Puedes continuar directo al monto o pulsar{' '}
+                <strong>+ Nuevo Concepto</strong> arriba.
+              </div>
+            ) : (
+              <div className="detalles-chips-wrap">
+                {detalles.map((det) => {
+                  const active = det.id === detalleId;
+                  return (
+                    <button
+                      key={det.id}
+                      type="button"
+                      className={`detalle-chip-btn ${active ? 'active' : ''}`}
+                      style={active ? { background: metaCat.color, borderColor: metaCat.color } : {}}
+                      onClick={() => seleccionarDetalle(det)}
+                    >
+                      <ConceptoIcon size={14} color={active ? '#ffffff' : metaCat.color} />
+                      <span>{det.nombre}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="wizard-pane-footer">
+              <button
+                type="button"
+                className="btn-wizard-back"
+                onClick={() => setPasoActual(2)}
+              >
+                <ArrowLeft size={16} />
+                <span>Cambiar Rubro</span>
+              </button>
+              <button
+                type="button"
+                className="btn-wizard-next"
+                style={{ background: metaCat.color }}
+                onClick={() => {
+                  setMedioPagoConfirmado(false);
+                  setPasoActual(4);
+                }}
+              >
+                <span>{detalleActual ? 'Continuar al monto' : 'Continuar sin concepto'}</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PASO 4: PRIMERO MEDIO DE PAGO -> AL ELEGIR DESAPARECE AL DETALLE Y QUEDA EL MONTO */}
+        {pasoActual === 4 && (
+          <form onSubmit={handleConfirmar} noValidate className="wizard-step-pane">
+            <div className="wizard-pane-header">
+              <div className="wizard-header-left-with-back">
                 <button
                   type="button"
-                  className="btn-collapse-toggle"
-                  onClick={() => setPaso1Abierto(!paso1Abierto)}
-                  title={paso1Abierto ? 'Contraer sección' : 'Desplegar sección'}
+                  className="btn-wizard-back"
+                  onClick={() => {
+                    if (medioPagoConfirmado && !editandoTx) {
+                      setMedioPagoConfirmado(false);
+                    } else {
+                      setPasoActual(3);
+                    }
+                  }}
                 >
-                  {paso1Abierto ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  <ArrowLeft size={16} />
+                  <span>{medioPagoConfirmado && !editandoTx ? 'Medio de pago' : 'Concepto'}</span>
                 </button>
+                <div>
+                  <span className="wizard-step-kicker" style={{ color: metaCat.color }}>
+                    Paso 4 de 4
+                  </span>
+                  <h3>{!medioPagoConfirmado ? '¿Con qué medio de pago fue?' : 'Ingresa el Monto'}</h3>
+                </div>
               </div>
             </div>
 
-            {paso1Abierto && (
-              <div className="step-collapsible-body">
-                {creandoArea && (
-                  <div className="inline-add-detalle">
-                    <input
-                      type="text"
-                      placeholder="Nombre de la nueva área (ej. Mascotas, Negocio)..."
-                      value={nuevaAreaNombre}
-                      onChange={(e) => setNuevaAreaNombre(e.target.value)}
-                    />
-                    <select
-                      value={nuevaAreaTipo}
-                      onChange={(e) => setNuevaAreaTipo(e.target.value)}
-                      className="inline-select-mini"
-                    >
-                      <option value="GASTO">💸 Gasto</option>
-                      <option value="INGRESO">💰 Ingreso</option>
-                      <option value="AHORRO">🐷 Ahorro</option>
-                    </select>
-                    <button type="button" className="btn-save-mini" onClick={handleCrearAreaRapida}>
-                      Crear Área
-                    </button>
-                  </div>
-                )}
-
-                <div className="friendly-cats-grid">
-                  {taxonomia.map((cat) => {
-                    const isSelected = cat.id === categoriaActual?.id;
-                    const m = getMetaCategoria(cat.codigo);
+            {!medioPagoConfirmado ? (
+              /* PRIMERO: SELECCIONAR MEDIO DE PAGO (AL TOCAR UNO, DESAPARECE Y PASA AL MONTO) */
+              <div className="form-block">
+                <div className="medios-chips-grid">
+                  {mediosPago.map((mp) => {
+                    const active = mp.id === medioPagoId;
                     return (
                       <button
-                        key={cat.id}
+                        key={mp.id}
                         type="button"
-                        className={`friendly-cat-card ${isSelected ? 'selected' : ''}`}
-                        style={
-                          isSelected
-                            ? { borderColor: m.color, background: m.bg, boxShadow: `0 0 0 2px ${m.color}` }
-                            : {}
-                        }
-                        onClick={() => seleccionarCategoria(cat)}
+                        className={`medio-chip-btn ${active ? 'active' : ''}`}
+                        onClick={() => {
+                          setMedioPagoId(mp.id);
+                          setMedioPagoConfirmado(true);
+                          setDetalleExpandido(false);
+                          setTimeout(() => montoInputRef.current?.focus(), 80);
+                        }}
                       >
-                        <span className="friendly-cat-emoji">{m.emoji}</span>
-                        <div className="friendly-cat-info">
-                          <strong>{m.nombre}</strong>
-                          <small>
-                            {cat.subcategorias?.length || 0} rubros · {cat.tipo === 'INGRESO' ? 'Ingreso' : cat.tipo === 'AHORRO' ? 'Ahorro' : 'Gasto'}
-                          </small>
-                        </div>
+                        <MedioPagoIcon nombre={mp.nombre} size={16} />
+                        <span>{nombreMedioPago(mp.nombre)}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
-            )}
-          </section>
-
-          {/* ==========================================
-              PASO 2: RUBRO DENTRO DEL ÁREA ELEGIDA
-              ========================================== */}
-          <section className="pocket-card collapsible-step-card">
-            <div
-              className="step-collapsible-header"
-              onClick={() => setPaso2Abierto(!paso2Abierto)}
-            >
-              <div className="step-header-left">
-                <span className="step-num" style={{ background: metaCat.color }}>2</span>
-                <div>
-                  <h3>
-                    Escoge el Rubro de {metaCat.emoji} {metaCat.nombre}
-                  </h3>
-                  <small className="step-selected-preview">
-                    {subcategoriaActual ? (
-                      <>
-                        Seleccionado:{' '}
-                        <strong>
-                          {emojiSubcategoria(subcategoriaActual.codigo)}{' '}
-                          {nombreSubcategoria(subcategoriaActual.codigo)}
-                        </strong>
-                      </>
-                    ) : (
-                      'Sin rubro seleccionado aún'
-                    )}
-                  </small>
-                </div>
-              </div>
-
-              <div className="step-header-right" onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  className="btn-mini-add"
-                  onClick={() => {
-                    setPaso2Abierto(true);
-                    setCreandoRubro(!creandoRubro);
-                  }}
-                >
-                  <Plus size={13} /> Nuevo Rubro
-                </button>
-                <button
-                  type="button"
-                  className="btn-collapse-toggle"
-                  onClick={() => setPaso2Abierto(!paso2Abierto)}
-                  title={paso2Abierto ? 'Contraer sección' : 'Desplegar sección'}
-                >
-                  {paso2Abierto ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {paso2Abierto && (
-              <div className="step-collapsible-body">
-                {creandoRubro && (
-                  <div className="inline-add-detalle">
+            ) : (
+              <>
+                {/* MONTO EN SOLES (SIEMPRE VISIBLE Y PROTAGONISTA) */}
+                <div className="form-block amount-highlight-block">
+                  <div
+                    className={`amount-input-box ${errorMsg ? 'amount-error-border' : ''}`}
+                    style={{ borderColor: errorMsg ? '#e11d48' : metaCat.color }}
+                  >
+                    <span className="currency-prefix" style={{ color: metaCat.color }}>S/</span>
                     <input
+                      ref={montoInputRef}
                       type="text"
-                      placeholder={`Nuevo rubro dentro de ${metaCat.nombre}...`}
-                      value={nuevoRubroTexto}
-                      onChange={(e) => setNuevoRubroTexto(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={montoStr}
+                      onChange={(e) => {
+                        setErrorMsg('');
+                        const val = e.target.value.replace(/[^0-9.,]/g, '');
+                        setMontoStr(val);
+                      }}
+                      className="amount-direct-input"
                     />
-                    <button type="button" className="btn-save-mini" onClick={handleCrearRubroRapido}>
-                      Guardar Rubro
-                    </button>
-                  </div>
-                )}
-
-                {subcategorias.length > 5 && (
-                  <div className="mini-filter-input">
-                    <Search size={14} />
-                    <input
-                      type="text"
-                      placeholder={`Filtrar rubros de ${metaCat.nombre}...`}
-                      value={filtroRubro}
-                      onChange={(e) => setFiltroRubro(e.target.value)}
-                    />
-                    {filtroRubro && (
-                      <button type="button" onClick={() => setFiltroRubro('')}>
-                        <X size={13} />
+                    {montoStr && (
+                      <button
+                        type="button"
+                        className="btn-clear-amount"
+                        onClick={() => setMontoStr('')}
+                        title="Borrar monto"
+                      >
+                        <X size={20} />
                       </button>
                     )}
                   </div>
-                )}
 
-                {subcategoriasFiltradas.length === 0 ? (
-                  <div className="empty-state-box">
-                    No hay rubros en esta área todavía. Pulsa <strong>+ Nuevo Rubro</strong> arriba para crear el primero.
-                  </div>
-                ) : (
-                  <div className="friendly-subcats-grid">
-                    {subcategoriasFiltradas.map((sub) => {
-                      const isSelected = sub.id === subcategoriaActual?.id;
-                      return (
-                        <button
-                          key={sub.id}
-                          type="button"
-                          className={`friendly-subcat-item-btn ${isSelected ? 'selected' : ''}`}
-                          style={
-                            isSelected
-                              ? {
-                                  borderColor: metaCat.color,
-                                  background: metaCat.bg,
-                                  boxShadow: `0 0 0 2px ${metaCat.color}`
-                                }
-                              : {}
-                          }
-                          onClick={() => seleccionarSubcategoria(sub)}
-                        >
-                          <span className="friendly-sub-emoji">{emojiSubcategoria(sub.codigo)}</span>
-                          <div className="friendly-sub-text">
-                            <strong>{nombreSubcategoria(sub.codigo)}</strong>
-                            <small>{sub.detalles?.length || 0} conceptos</small>
-                          </div>
-                          {isSelected && <Check size={16} style={{ color: metaCat.color, marginLeft: 'auto' }} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* ==========================================
-              PASO 3: CONCEPTO ESPECÍFICO DENTRO DEL RUBRO
-              ========================================== */}
-          <section className="pocket-card collapsible-step-card">
-            <div
-              className="step-collapsible-header"
-              onClick={() => setPaso3Abierto(!paso3Abierto)}
-            >
-              <div className="step-header-left">
-                <span className="step-num" style={{ background: metaCat.color }}>3</span>
-                <div>
-                  <h3>
-                    Escoge el Concepto de{' '}
-                    {subcategoriaActual ? nombreSubcategoria(subcategoriaActual.codigo) : '—'}
-                  </h3>
-                  <small className="step-selected-preview">
-                    {detalleActual ? (
-                      <>
-                        Seleccionado: <strong>📄 {detalleActual.nombre}</strong>
-                      </>
-                    ) : (
-                      'Opcional: toca un concepto o crea uno nuevo'
-                    )}
-                  </small>
-                </div>
-              </div>
-
-              <div className="step-header-right" onClick={(e) => e.stopPropagation()}>
-                {subcategoriaActual && (
-                  <button
-                    type="button"
-                    className="btn-mini-add"
-                    onClick={() => {
-                      setPaso3Abierto(true);
-                      setCreandoDetalle(!creandoDetalle);
-                    }}
-                  >
-                    <Plus size={13} /> Nuevo Concepto
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn-collapse-toggle"
-                  onClick={() => setPaso3Abierto(!paso3Abierto)}
-                  title={paso3Abierto ? 'Contraer sección' : 'Desplegar sección'}
-                >
-                  {paso3Abierto ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {paso3Abierto && (
-              <div className="step-collapsible-body">
-                {creandoDetalle && (
-                  <div className="inline-add-detalle">
-                    <input
-                      type="text"
-                      placeholder="Escribe el nuevo concepto (ej. Frutería, Movilidad)..."
-                      value={nuevoDetalleTexto}
-                      onChange={(e) => setNuevoDetalleTexto(e.target.value)}
-                    />
-                    <button type="button" className="btn-save-mini" onClick={handleAgregarDetalle}>
-                      Guardar Concepto
-                    </button>
-                  </div>
-                )}
-
-                {!subcategoriaActual ? (
-                  <div className="empty-state-box">
-                    Primero selecciona o crea un Rubro en el Paso 2.
-                  </div>
-                ) : detalles.length === 0 ? (
-                  <div className="empty-state-box">
-                    Este rubro aún no tiene conceptos específicos. Puedes registrar así o pulsar{' '}
-                    <strong>+ Nuevo Concepto</strong> arriba.
-                  </div>
-                ) : (
-                  <div className="detalles-chips-wrap">
-                    {detalles.map((det) => {
-                      const active = det.id === detalleId;
-                      return (
-                        <button
-                          key={det.id}
-                          type="button"
-                          className={`detalle-chip-btn ${active ? 'active' : ''}`}
-                          style={active ? { background: metaCat.color, borderColor: metaCat.color } : {}}
-                          onClick={() => setDetalleId(det.id)}
-                        >
-                          {active && <Check size={14} />}
-                          <span>{det.nombre}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* ============================================================
-            COLUMNA DERECHA: RESUMEN DE RUTA + PASO 4 (PAGO) + PASO 5 (MONTO S/)
-            ============================================================ */}
-        <div className="register-col-form">
-          <form onSubmit={handleConfirmar} noValidate className="pocket-card register-form-card">
-            {/* RUTA DE CARPETAS SELECCIONADA (1 ➔ 2 ➔ 3) */}
-            <div
-              className="selected-hierarchy-banner"
-              style={{ background: metaCat.bg, borderColor: metaCat.border }}
-            >
-              <div className="sh-breadcrumb-title">
-                <FolderOpen size={15} style={{ color: metaCat.color }} />
-                <span>Resumen de lo que vas a anotar:</span>
-              </div>
-
-              <div className="sh-breadcrumb-steps">
-                <span className="sh-pill">
-                  {metaCat.emoji} {metaCat.nombre}
-                </span>
-                <ArrowRight size={13} className="sh-arrow" />
-                <span className="sh-pill">
-                  {subcategoriaActual
-                    ? `${emojiSubcategoria(subcategoriaActual.codigo)} ${nombreSubcategoria(subcategoriaActual.codigo)}`
-                    : 'Sin rubro'}
-                </span>
-                {detalleActual && (
-                  <>
-                    <ArrowRight size={13} className="sh-arrow" />
-                    <span className="sh-pill strong" style={{ borderColor: metaCat.color, color: metaCat.color }}>
-                      📄 {detalleActual.nombre}
-                    </span>
-                  </>
-                )}
-              </div>
-
-              <div className="sh-meta-controls">
-                <div className="discreet-date-wrap">
-                  {!mostrarSelectorFecha ? (
+                  <div className="quick-add-amounts">
+                    {[10, 20, 50, 100, 200].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        className="quick-amt-chip"
+                        onClick={() => sumarMontoRapido(val)}
+                      >
+                        +S/ {val}
+                      </button>
+                    ))}
                     <button
                       type="button"
-                      className="btn-discreet-date"
-                      onClick={() => setMostrarSelectorFecha(true)}
+                      className="quick-amt-chip toggle-pad"
+                      onClick={() => setMostrarTeclado(!mostrarTeclado)}
                     >
-                      <Calendar size={13} />
-                      <span>Fecha: {fecha === hoyISO() ? 'Hoy' : fecha}</span>
+                      <Keyboard size={14} />
+                      <span>{mostrarTeclado ? 'Ocultar teclado' : 'Teclado'}</span>
                     </button>
-                  ) : (
-                    <input
-                      type="date"
-                      className="input-discreet-date"
-                      value={fecha}
-                      onChange={(e) => setFecha(e.target.value || hoyISO())}
-                      onBlur={() => setMostrarSelectorFecha(false)}
-                    />
+                  </div>
+
+                  {mostrarTeclado && (
+                    <div className="numeric-keypad-grid">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'DEL'].map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          className={`keypad-key ${k === 'DEL' ? 'key-del' : ''}`}
+                          onClick={() => pulsarTecla(k)}
+                        >
+                          {k === 'DEL' ? <Delete size={18} /> : k}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
-            </div>
 
-            {/* PASO 4: ¿CON QUÉ PAGASTE? */}
-            <div className="form-block">
-              <label className="step-title-inline">
-                <span className="step-num" style={{ background: metaCat.color }}>4</span>
-                <span>¿Con qué medio de pago fue?</span>
-              </label>
-              <div className="medios-chips-grid">
-                {mediosPago.map((mp) => {
-                  const active = mp.id === medioPagoId;
-                  return (
-                    <button
-                      key={mp.id}
-                      type="button"
-                      className={`medio-chip-btn ${active ? 'active' : ''}`}
-                      onClick={() => setMedioPagoId(mp.id)}
-                    >
-                      {nombreMedioPago(mp.nombre)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* PASO 5: MONTO EN SOLES (S/) */}
-            <div className="form-block amount-highlight-block">
-              <div className="form-block-header">
-                <label className="step-title-inline">
-                  <span className="step-num" style={{ background: metaCat.color }}>5</span>
-                  <span>¿Cuánto dinero fue? (Soles)</span>
-                </label>
-              </div>
-
-              <div
-                className={`amount-input-box ${errorMsg ? 'amount-error-border' : ''}`}
-                style={{ borderColor: errorMsg ? '#e11d48' : metaCat.color }}
-              >
-                <span className="currency-prefix" style={{ color: metaCat.color }}>S/</span>
-                <input
-                  ref={montoInputRef}
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={montoStr}
-                  onChange={(e) => {
-                    setErrorMsg('');
-                    const val = e.target.value.replace(/[^0-9.,]/g, '');
-                    setMontoStr(val);
-                  }}
-                  className="amount-direct-input"
-                />
-                {montoStr && (
+                {/* DETALLE COLAPSADO POR DEFECTO (RUTA + MEDIO DE PAGO + FECHA + NOTA) */}
+                <div className="wizard-detail-accordion">
                   <button
                     type="button"
-                    className="btn-clear-amount"
-                    onClick={() => setMontoStr('')}
-                    title="Borrar monto"
+                    className="wizard-detail-toggle"
+                    onClick={() => setDetalleExpandido(!detalleExpandido)}
+                    style={{ borderColor: metaCat.border, background: metaCat.bg }}
                   >
-                    <X size={20} />
+                    <div className="wdt-summary">
+                      <CategoriaIcon codigo={categoriaActual?.codigo} size={15} />
+                      <span className="wdt-text">
+                        <strong>{metaCat.nombre}</strong>
+                        {subcategoriaActual ? ` › ${nombreSubcategoria(subcategoriaActual.codigo)}` : ''}
+                        {detalleActual ? ` › ${detalleActual.nombre}` : ''}
+                        {' · '}
+                        {nombreMedioPago(mediosPago.find((m) => m.id === medioPagoId)?.nombre || '')}
+                        {' · '}
+                        {fecha === hoyISO() ? 'Hoy' : fecha}
+                      </span>
+                    </div>
+                    <span className="wdt-action" style={{ color: metaCat.color }}>
+                      <span>{detalleExpandido ? 'Ocultar' : 'Detalle'}</span>
+                      {detalleExpandido ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </span>
                   </button>
-                )}
-              </div>
 
-              {/* Botones de billetes rápidos */}
-              <div className="quick-add-amounts">
-                {[10, 20, 50, 100, 200].map((val) => (
-                  <button
-                    key={val}
-                    type="button"
-                    className="quick-amt-chip"
-                    onClick={() => sumarMontoRapido(val)}
-                  >
-                    +S/ {val}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="quick-amt-chip toggle-pad"
-                  onClick={() => setMostrarTeclado(!mostrarTeclado)}
-                >
-                  {mostrarTeclado ? 'Ocultar teclado' : '🔢 Teclado'}
-                </button>
-              </div>
+                  {detalleExpandido && (
+                    <div className="wizard-detail-body">
+                      {/* Ruta clickeable para regresar */}
+                      <div className="sh-breadcrumb-steps">
+                        <button
+                          type="button"
+                          className="sh-pill clickable"
+                          onClick={() => setPasoActual(1)}
+                        >
+                          <CategoriaIcon codigo={categoriaActual?.codigo} size={14} />
+                          <span>{metaCat.nombre}</span>
+                        </button>
+                        <ArrowRight size={13} className="sh-arrow" />
+                        <button
+                          type="button"
+                          className="sh-pill clickable"
+                          onClick={() => setPasoActual(2)}
+                        >
+                          <SubcategoriaIcon
+                            codigo={subcategoriaActual?.codigo}
+                            categoriaCodigo={categoriaActual?.codigo}
+                            size={14}
+                          />
+                          <span>
+                            {subcategoriaActual ? nombreSubcategoria(subcategoriaActual.codigo) : 'Sin rubro'}
+                          </span>
+                        </button>
+                        {detalleActual && (
+                          <>
+                            <ArrowRight size={13} className="sh-arrow" />
+                            <button
+                              type="button"
+                              className="sh-pill strong clickable"
+                              style={{ borderColor: metaCat.color, color: metaCat.color }}
+                              onClick={() => setPasoActual(3)}
+                            >
+                              <ConceptoIcon size={13} color={metaCat.color} />
+                              <span>{detalleActual.nombre}</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
 
-              {mostrarTeclado && (
-                <div className="numeric-keypad-grid">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'DEL'].map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      className={`keypad-key ${k === 'DEL' ? 'key-del' : ''}`}
-                      onClick={() => pulsarTecla(k)}
-                    >
-                      {k === 'DEL' ? <Delete size={18} /> : k}
-                    </button>
-                  ))}
+                      {/* Fecha */}
+                      <div className="sh-meta-controls">
+                        <div className="discreet-date-wrap">
+                          {!mostrarSelectorFecha ? (
+                            <button
+                              type="button"
+                              className="btn-discreet-date"
+                              onClick={() => setMostrarSelectorFecha(true)}
+                            >
+                              <Calendar size={13} />
+                              <span>Fecha: {fecha === hoyISO() ? 'Hoy' : fecha}</span>
+                            </button>
+                          ) : (
+                            <input
+                              type="date"
+                              className="input-discreet-date"
+                              value={fecha}
+                              onChange={(e) => setFecha(e.target.value || hoyISO())}
+                              onBlur={() => setMostrarSelectorFecha(false)}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Medio de pago */}
+                      <div className="form-block">
+                        <label className="step-title-inline">
+                          <span>¿Con qué medio de pago fue?</span>
+                        </label>
+                        <div className="medios-chips-grid">
+                          {mediosPago.map((mp) => {
+                            const active = mp.id === medioPagoId;
+                            return (
+                              <button
+                                key={mp.id}
+                                type="button"
+                                className={`medio-chip-btn ${active ? 'active' : ''}`}
+                                onClick={() => setMedioPagoId(mp.id)}
+                              >
+                                <MedioPagoIcon nombre={mp.nombre} size={15} />
+                                <span>{nombreMedioPago(mp.nombre)}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Nota opcional */}
+                      <div className="form-block">
+                        <label>Nota adicional (opcional)</label>
+                        <input
+                          type="text"
+                          className="obs-text-input"
+                          placeholder="Ej. Compras de la semana en Wong, almuerzo familiar..."
+                          value={observaciones}
+                          onChange={(e) => setObservaciones(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* NOTA OPCIONAL */}
-            <div className="form-block">
-              <label>Nota adicional (opcional)</label>
-              <input
-                type="text"
-                className="obs-text-input"
-                placeholder="Ej. Compras de la semana en Wong, almuerzo familiar..."
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-              />
-            </div>
+                {errorMsg && (
+                  <div className="alert-error-box inline-feedback">
+                    <AlertCircle size={18} />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
 
-            {/* Mensajes de error o éxito visibles JUSTO ENCIMA DEL BOTÓN */}
-            {errorMsg && (
-              <div className="alert-error-box inline-feedback">
-                <AlertCircle size={18} />
-                <span>{errorMsg}</span>
-              </div>
+                <button
+                  type="submit"
+                  className="btn-confirm-transaction"
+                  style={{ background: metaCat.color }}
+                  disabled={guardando}
+                >
+                  <Sparkles size={19} />
+                  <span>
+                    {guardando
+                      ? 'Guardando...'
+                      : editandoTx
+                        ? 'Guardar Cambios'
+                        : `${verboAccion}${montoStr ? ` por ${formatSoles(String(montoStr).replace(',', '.'))}` : ''}`}
+                  </span>
+                </button>
+              </>
             )}
-
-            {mensajeExito && (
-              <div className="toast-success-inline inline-feedback">
-                <Check size={18} />
-                <span>{mensajeExito}</span>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleConfirmar}
-              className="btn-confirm-transaction"
-              style={{ background: metaCat.color }}
-              disabled={guardando}
-            >
-              <Sparkles size={19} />
-              <span>
-                {guardando
-                  ? 'Guardando...'
-                  : editandoTx
-                    ? 'Guardar Cambios'
-                    : `${verboAccion}${montoStr ? ` por ${formatSoles(String(montoStr).replace(',', '.'))}` : ''}`}
-              </span>
-            </button>
           </form>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -5,16 +5,6 @@
 // ============================================================
 import React from 'react';
 import {
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  PiggyBank,
-  CheckCircle2,
-  Plus,
-  Minus,
-  Star,
-  ArrowUpRight,
-  ArrowDownRight,
   Trash2,
   Pencil,
   ChevronRight
@@ -27,32 +17,13 @@ import {
   getMetaCategoria,
   nombreCategoria,
   nombreSubcategoria,
-  emojiSubcategoria,
   nombreMedioPago
 } from '../utils/format';
-
-function VariacionBadge({ pct, invertirColor = false }) {
-  if (pct === null || pct === undefined) {
-    return <span className="var-badge neutral">Mes actual</span>;
-  }
-  const sube = pct >= 0;
-  const esPositivo = invertirColor ? !sube : sube;
-  return (
-    <span className={`var-badge ${pct === 0 ? 'neutral' : esPositivo ? 'good' : 'bad'}`}>
-      {sube ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-      {sube ? '+' : ''}
-      {pct}% vs ant.
-    </span>
-  );
-}
+import { CategoriaIcon, SubcategoriaIcon, MedioPagoIcon } from './IconoFamicash';
 
 export default function VistaDashboard({
-  usuario,
   resumen,
   transacciones = [],
-  favoritos = [],
-  onQuickRegister,
-  onOpenFavorito,
   onDrillCategoria,
   onEditTransaccion,
   onDeleteTransaccion,
@@ -65,159 +36,10 @@ export default function VistaDashboard({
     ahorros: 0,
     total: 0
   };
-  const variacion = resumen?.variacion || {};
   const distribucion = resumen?.distribucion || [];
 
   return (
     <div className="dashboard-container">
-      {/* Banner principal pensado para usar desde el celular al instante */}
-      <div className="welcome-banner-card">
-        <div className="welcome-text-block">
-          <span className="welcome-eyebrow">
-            Billetera Familiar · {resumen?.periodo?.etiqueta || ''}
-          </span>
-          <h2>¡Hola, {usuario?.nombre || 'Familia'}! 👋</h2>
-          <p>
-            Mira de un vistazo cuánto ingresó, cuánto se gastó y cuánto dinero libre queda en casa.
-          </p>
-        </div>
-
-        <div className="quick-type-actions">
-          <button
-            type="button"
-            className="quick-action-pill gasto-primary"
-            onClick={() => onQuickRegister('II_GENERALES')}
-          >
-            <span className="qa-icon"><Minus size={18} /></span>
-            <span>Anotar Gasto</span>
-          </button>
-          <button
-            type="button"
-            className="quick-action-pill ingreso"
-            onClick={() => onQuickRegister('I_INGRESOS')}
-          >
-            <span className="qa-icon"><Plus size={18} /></span>
-            <span>Anotar Ingreso</span>
-          </button>
-          <button
-            type="button"
-            className="quick-action-pill ahorro"
-            onClick={() => onQuickRegister('VI_AHORRO')}
-          >
-            <span className="qa-icon"><PiggyBank size={18} /></span>
-            <span>Guardar Ahorro</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 5 Tarjetas de Resumen (Clarísimas a primera vista) */}
-      <div className="kpi-cards-grid-5">
-        {/* 1. Ingresos */}
-        <div className="kpi-stat-card ingreso">
-          <div className="kpi-card-top">
-            <span className="kpi-label">1. Ingresos del mes</span>
-            <div className="kpi-icon-circle ingreso"><TrendingUp size={18} /></div>
-          </div>
-          <div className="kpi-amount">{formatSoles(actual.ingresos)}</div>
-          <div className="kpi-card-bottom">
-            <VariacionBadge pct={variacion.ingresos} />
-            <span className="kpi-formula-hint">Sueldos e ingresos extras</span>
-          </div>
-        </div>
-
-        {/* 2. Gastos */}
-        <div className="kpi-stat-card gasto">
-          <div className="kpi-card-top">
-            <span className="kpi-label">2. Total Gastado</span>
-            <div className="kpi-icon-circle gasto"><TrendingDown size={18} /></div>
-          </div>
-          <div className="kpi-amount">{formatSoles(actual.gastos)}</div>
-          <div className="kpi-card-bottom">
-            <VariacionBadge pct={variacion.gastos} invertirColor />
-            <span className="kpi-formula-hint">Hogar, Lara, Vanessa y Anthony</span>
-          </div>
-        </div>
-
-        {/* 3. Disponible */}
-        <div className="kpi-stat-card disponible">
-          <div className="kpi-card-top">
-            <span className="kpi-label">3. Queda Disponible</span>
-            <div className="kpi-icon-circle disponible"><Wallet size={18} /></div>
-          </div>
-          <div className="kpi-amount">{formatSoles(actual.disponible)}</div>
-          <div className="kpi-card-bottom">
-            <VariacionBadge pct={variacion.disponible} />
-            <span className="kpi-formula-hint">Ingresos menos Gastos</span>
-          </div>
-        </div>
-
-        {/* 4. Ahorros */}
-        <div className="kpi-stat-card ahorro">
-          <div className="kpi-card-top">
-            <span className="kpi-label">4. Ahorro Guardado</span>
-            <div className="kpi-icon-circle ahorro"><PiggyBank size={18} /></div>
-          </div>
-          <div className="kpi-amount">{formatSoles(actual.ahorros)}</div>
-          <div className="kpi-card-bottom">
-            <VariacionBadge pct={variacion.ahorros} />
-            <span className="kpi-formula-hint">Apartado para metas</span>
-          </div>
-        </div>
-
-        {/* 5. Saldo Libre */}
-        <div className="kpi-stat-card total">
-          <div className="kpi-card-top">
-            <span className="kpi-label">5. Saldo Libre Final</span>
-            <div className="kpi-icon-circle total"><CheckCircle2 size={18} /></div>
-          </div>
-          <div className="kpi-amount">{formatSoles(actual.total)}</div>
-          <div className="kpi-card-bottom">
-            <VariacionBadge pct={variacion.total} />
-            <span className="kpi-formula-hint">Lo que sobra tras ahorrar</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Atajos de Bolsillo: Toca uno para ir directo a poner el monto */}
-      <div className="favorites-bar-card">
-        <div className="favorites-bar-header">
-          <div className="fav-title-wrap">
-            <Star size={16} className="star-icon-filled" />
-            <span>¿Qué acabas de pagar? Toca un atajo rápido para anotarlo:</span>
-          </div>
-          <button
-            type="button"
-            className="btn-link-subtle"
-            onClick={() => onGoToView('register')}
-          >
-            Personalizar atajos →
-          </button>
-        </div>
-
-        <div className="pocket-favs-grid">
-          {favoritos.map((fav) => {
-            const meta = getMetaCategoria(fav.categoria);
-            return (
-              <button
-                key={fav.subcategoriaId}
-                type="button"
-                className="pocket-fav-btn"
-                style={{ borderColor: meta.border, background: meta.bg }}
-                onClick={() => onOpenFavorito(fav)}
-              >
-                <span className="pocket-fav-emoji">{emojiSubcategoria(fav.subcategoria)}</span>
-                <div className="pocket-fav-text">
-                  <strong>{nombreSubcategoria(fav.subcategoria)}</strong>
-                  <small style={{ color: meta.color }}>
-                    {meta.emoji} {nombreCategoria(fav.categoria)}
-                  </small>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Cuerpo en 2 columnas: ¿En qué se va el dinero? + Últimos Movimientos */}
       <div className="dashboard-two-cols">
         {/* Columna 1: Gráfico de Dona con nombres amigables */}
@@ -289,7 +111,10 @@ export default function VistaDashboard({
                         style={{ background: meta.color || PALETA_DONA[idx % PALETA_DONA.length] }}
                       />
                       <div className="legend-name-col">
-                        <strong>{meta.emoji} {meta.nombre}</strong>
+                        <strong className="legend-name-with-icon">
+                          <CategoriaIcon codigo={item.categoria} size={15} />
+                          <span>{meta.nombre}</span>
+                        </strong>
                         <small>{meta.descripcion}</small>
                       </div>
                       <div className="legend-amount-col">
@@ -340,20 +165,28 @@ export default function VistaDashboard({
 
                     <div className="tx-main-info">
                       <div className="tx-title-line">
-                        <strong>
-                          {emojiSubcategoria(tx.subcategoria)}{' '}
-                          {tx.detalle || nombreSubcategoria(tx.subcategoria)}
-                        </strong>
+                        <SubcategoriaIcon
+                          codigo={tx.subcategoria}
+                          categoriaCodigo={tx.categoria}
+                          size={15}
+                        />
+                        <strong>{tx.detalle || nombreSubcategoria(tx.subcategoria)}</strong>
                         {tx.clase && <span className="tx-class-tag">{tx.clase}</span>}
                       </div>
                       <div className="tx-sub-line">
-                        <span>{meta.emoji} {nombreCategoria(tx.categoria)}</span>
+                        <span className="tx-cat-inline">
+                          <CategoriaIcon codigo={tx.categoria} size={13} />
+                          {nombreCategoria(tx.categoria)}
+                        </span>
                         <span>›</span>
                         <span>{nombreSubcategoria(tx.subcategoria)}</span>
                         {tx.medioPago && (
                           <>
                             <span>·</span>
-                            <span className="tx-medio-tag">{nombreMedioPago(tx.medioPago)}</span>
+                            <span className="tx-medio-tag">
+                              <MedioPagoIcon nombre={tx.medioPago} size={12} />
+                              {nombreMedioPago(tx.medioPago)}
+                            </span>
                           </>
                         )}
                       </div>
