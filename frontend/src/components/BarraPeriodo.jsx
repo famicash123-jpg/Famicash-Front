@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Download, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { desplazarPeriodo, etiquetaPeriodo, periodoActual } from '../utils/format';
 
 export default function BarraPeriodo({
@@ -9,10 +9,8 @@ export default function BarraPeriodo({
   setPeriodoClave,
   onExportExcel,
   exporting = false,
-  showFilterToggle = false,
-  filtersOpen = false,
-  setFiltersOpen,
-  activeFiltersCount = 0
+  isFullscreen = false,
+  onToggleFullscreen
 }) {
   const cambiarTipo = (nuevoTipo) => {
     setPeriodoTipo(nuevoTipo);
@@ -58,19 +56,17 @@ export default function BarraPeriodo({
         </button>
       </div>
 
-      {/* Acciones rápidas: Filtros y Exportar Excel */}
+      {/* Acciones rápidas: Pantalla completa y Exportar Excel */}
       <div className="period-actions-group">
-        {showFilterToggle && (
+        {onToggleFullscreen && (
           <button
             type="button"
-            className={`btn-filter-toggle ${filtersOpen || activeFiltersCount > 0 ? 'active' : ''}`}
-            onClick={() => setFiltersOpen(!filtersOpen)}
+            className="btn-filter-toggle desktop-fullscreen-btn"
+            onClick={onToggleFullscreen}
+            title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
           >
-            <Filter size={16} />
-            <span>Filtros</span>
-            {activeFiltersCount > 0 && (
-              <span className="filter-count-badge">{activeFiltersCount}</span>
-            )}
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            <span>{isFullscreen ? 'Salir' : 'Pantalla completa'}</span>
           </button>
         )}
 

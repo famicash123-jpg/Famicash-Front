@@ -192,15 +192,28 @@ export default function VistaPresupuestos({
               <small style={{ color: '#64748b' }}>(Para juntar ahorros, usa la pestaña Metas).</small>
             </p>
           </div>
-          <button
-            type="button"
-            className="btn-primary-inline"
-            onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          >
-            <Plus size={15} />
-            <span>{mostrarFormulario ? 'Ocultar formulario' : 'Nuevo tope'}</span>
-            {mostrarFormulario ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
+          <div className="budgets-header-actions">
+            {data.items.length === 0 && (
+              <button
+                type="button"
+                className="btn-secondary-action"
+                onClick={handleCopiarAnterior}
+                disabled={loading}
+              >
+                <Copy size={15} />
+                <span>Repetir mes pasado</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-primary-inline"
+              onClick={() => setMostrarFormulario(!mostrarFormulario)}
+            >
+              <Plus size={15} />
+              <span>{mostrarFormulario ? 'Ocultar formulario' : 'Nuevo tope'}</span>
+              {mostrarFormulario ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+          </div>
         </div>
 
         {mensaje && (
@@ -304,7 +317,18 @@ export default function VistaPresupuestos({
               {data.items.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="empty-table-cell">
-                    Aún no has definido topes de presupuesto para este periodo. Usa el formulario de arriba.
+                    <div className="empty-copy-btn-wrap">
+                      <span>Aún no has definido topes de presupuesto para este periodo.</span>
+                      <button
+                        type="button"
+                        className="btn-secondary-action"
+                        onClick={handleCopiarAnterior}
+                        disabled={loading}
+                      >
+                        <Copy size={15} />
+                        <span>Repetir los topes del periodo anterior</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (

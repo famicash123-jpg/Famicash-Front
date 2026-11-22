@@ -20,8 +20,11 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  Keyboard
+  Keyboard,
+  Paperclip,
+  FileText
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api';
 import {
   hoyISO,
@@ -43,6 +46,7 @@ export default function VistaRegistro({
   mediosPago = [],
   preset = null,
   editandoTx = null,
+  presupuestosMensuales = [],
   onClearEdit,
   onSaveTransaccion,
   onQuickCreateDetalle,
@@ -76,12 +80,14 @@ export default function VistaRegistro({
 
   const [guardando, setGuardando] = useState(false);
   const [mensajeExito, setMensajeExito] = useState('');
+  const [confirmacionOverlay, setConfirmacionOverlay] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [mostrarTeclado, setMostrarTeclado] = useState(false);
-  const [detalleExpandido, setDetalleExpandido] = useState(false);
-  const [medioPagoConfirmado, setMedioPagoConfirmado] = useState(false);
+  const [adjunto, setAdjunto] = useState(null); // { nombre, tipo, data }
+  const [adjuntoModificado, setAdjuntoModificado] = useState(false);
 
   const montoInputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Inicializar selección cuando se edita o viene un atajo
   useEffect(() => {
@@ -94,7 +100,28 @@ export default function VistaRegistro({
       setClase(editandoTx.clase || 'Cotidiano');
       setObservaciones(editandoTx.observaciones || '');
       setFecha(editandoTx.fecha || hoyISO());
-      setMedioPagoConfirmado(true);
+      setAdjunto(null);
+      setAdjuntoModificado(false);
+      if (editandoTx.adjuntoUrl) {
+        setAdjunto({
+          nombre: editandoTx.adjuntoNombre || 'adjunto',
+          tipo: editandoTx.adjuntoTipo || '',
+          data: editandoTx.adjuntoUrl
+        });
+      } else if (editandoTx.tieneAdjunto) {
+        api.getAdjuntoTransaccion(editandoTx.id)
+          .then((res) => {
+            const url = res?.adjuntoUrl || res?.adjuntoData;
+            if (url) {
+              setAdjunto({
+                nombre: res.adjuntoNombre || 'adjunto',
+                tipo: res.adjuntoTipo || '',
+                data: url
+              });
+            }
+          })
+          .catch(() => null);
+      }
       setPasoActual(4);
       return;
     }
@@ -228,7 +255,6 @@ export default function VistaRegistro({
   const seleccionarDetalle = (det) => {
     setDetalleId(det.id);
     setErrorMsg('');
-    setMedioPagoConfirmado(false);
     setPasoActual(4);
   };
 
@@ -238,8 +264,28 @@ export default function VistaRegistro({
     setDetalleId(r.det?.id || null);
     setBusquedaGlobal('');
     setErrorMsg('');
-    setMedioPagoConfirmado(false);
     setPasoActual(4);
+  };
+
+  const handleAdjuntoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      setErrorMsg('El archivo adjunto no debe superar los 4 MB.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAdjunto({
+        nombre: file.name,
+        tipo: file.type || 'application/octet-stream',
+        data: String(reader.result || '')
+      });
+      setAdjuntoModificado(true);
+      setErrorMsg('');
+    };
+    reader.readAsDataURL(file);
   };
 
   // Crear nueva Área Familiar desde el Paso 1
@@ -357,27 +403,50 @@ export default function VistaRegistro({
 
     setGuardando(true);
     try {
-      await onSaveTransaccion(
-        {
-          subcategoriaId: subcategoriaActual.id,
-          detalleId: detalleId || null,
-          medioPagoId: medioPagoId || null,
-          monto: montoNum,
-          clase,
-          observaciones: observaciones.trim() || null,
-          fecha
-        },
-        editandoTx?.id
-      );
+      const payload = {
+        subcategoriaId: subcategoriaActual.id,
+        detalleId: detalleId || null,
+        medioPagoId: medioPagoId || null,
+        monto: montoNum,
+        clase,
+        observaciones: observaciones.trim() || null,
+        fecha
+      };
+      if (!editandoTx && adjunto) {
+        payload.adjunto = adjunto;
+      } else if (editandoTx && adjuntoModificado) {
+        payload.adjunto = adjunto; // null si fue eliminado, objeto si fue cambiado
+      }
+      await onSaveTransaccion(payload, editandoTx?.id);
       setMontoStr('');
       setObservaciones('');
-      setMensajeExito(
-        editandoTx
-          ? 'Movimiento actualizado correctamente.'
-          : `Guardado: ${formatSoles(montoNum)} en ${nombreCategoria(categoriaActual?.codigo)} › ${nombreSubcategoria(subcategoriaActual.codigo)}`
-      );
+      setAdjunto(null);
+      setAdjuntoModificado(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      const tipoTxt =
+        categoriaActual?.tipo === 'INGRESO'
+          ? '¡Ingreso registrado!'
+          : categoriaActual?.tipo === 'AHORRO'
+            ? '¡Ahorro registrado!'
+            : '¡Gasto registrado!';
+      const medioNombre = nombreMedioPago(mediosPago.find((m) => m.id === medioPagoId)?.nombre || '');
+      const rutaTxt = [
+        nombreCategoria(categoriaActual?.codigo),
+        nombreSubcategoria(subcategoriaActual.codigo),
+        detalleActual?.nombre
+      ]
+        .filter(Boolean)
+        .join(' › ');
+      setConfirmacionOverlay({
+        titulo: editandoTx ? '¡Movimiento actualizado!' : tipoTxt,
+        monto: formatSoles(montoNum),
+        ruta: rutaTxt,
+        medioPago: medioNombre,
+        fecha: fecha === hoyISO() ? 'Hoy' : fecha,
+        color: metaCat.color
+      });
       setPasoActual(1);
-      setTimeout(() => setMensajeExito(''), 4500);
+      setTimeout(() => setConfirmacionOverlay(null), 2000);
     } catch (err) {
       setErrorMsg(err.message || 'Error al guardar el movimiento');
     } finally {
@@ -423,15 +492,67 @@ export default function VistaRegistro({
   ];
 
   return (
-    <div className="pocket-register-shell wizard-shell">
+    <motion.div
+      className="pocket-register-shell wizard-shell"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: 'easeOut' }}
+    >
+      <AnimatePresence>
+        {confirmacionOverlay && (
+          <motion.div
+            className="plin-success-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setConfirmacionOverlay(null)}
+            role="status"
+            aria-live="polite"
+          >
+            <motion.div
+              className="plin-success-card"
+              initial={{ opacity: 0, scale: 0.85, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -10 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+            >
+              <motion.div
+                className="plin-check-circle"
+                style={{ background: confirmacionOverlay.color || '#059669' }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 18, delay: 0.08 }}
+              >
+                <Check size={42} strokeWidth={3} color="#ffffff" />
+              </motion.div>
+              <span className="plin-kicker">FamiCash</span>
+              <h2 className="plin-title">{confirmacionOverlay.titulo}</h2>
+              <div className="plin-amount">{confirmacionOverlay.monto}</div>
+              <p className="plin-route">{confirmacionOverlay.ruta}</p>
+              <div className="plin-meta-pills">
+                {confirmacionOverlay.medioPago && <span>{confirmacionOverlay.medioPago}</span>}
+                <span>{confirmacionOverlay.fecha}</span>
+              </div>
+              <div className="plin-progress-bar">
+                <div
+                  className="plin-progress-fill"
+                  style={{ background: confirmacionOverlay.color || '#059669' }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {editandoTx && (
         <div className="editing-banner">
           <div>
             <strong>Editando movimiento:</strong>{' '}
             <span>{nombreSubcategoria(editandoTx.subcategoria)}</span>
           </div>
-          <button type="button" className="btn-cancel-edit" onClick={onClearEdit}>
-            <X size={15} /> Cancelar edición
+          <button type="button" className="btn-cancel-edit-prominent" onClick={onClearEdit}>
+            <X size={16} />
+            <span>Cancelar edición</span>
           </button>
         </div>
       )}
@@ -815,280 +936,278 @@ export default function VistaRegistro({
                 type="button"
                 className="btn-wizard-next"
                 style={{ background: metaCat.color }}
-                onClick={() => {
-                  setMedioPagoConfirmado(false);
-                  setPasoActual(4);
-                }}
+                onClick={() => setPasoActual(4)}
               >
-                <span>{detalleActual ? 'Continuar al monto' : 'Continuar sin concepto'}</span>
+                <span>{detalleActual ? 'Continuar al formulario' : 'Continuar sin concepto'}</span>
                 <ArrowRight size={16} />
               </button>
             </div>
           </div>
         )}
 
-        {/* PASO 4: PRIMERO MEDIO DE PAGO -> AL ELEGIR DESAPARECE AL DETALLE Y QUEDA EL MONTO */}
+        {/* PASO 4: FORMULARIO DIRECTO (Fecha x default, 1. Monto, 2. Medio pago, 3. Comentario, 4. Foto/PDF) */}
         {pasoActual === 4 && (
-          <form onSubmit={handleConfirmar} noValidate className="wizard-step-pane">
-            <div className="wizard-pane-header">
+          <form onSubmit={handleConfirmar} noValidate className="wizard-step-pane reg-form-card">
+            <div className="wizard-pane-header reg-form-header">
               <div className="wizard-header-left-with-back">
                 <button
                   type="button"
                   className="btn-wizard-back"
-                  onClick={() => {
-                    if (medioPagoConfirmado && !editandoTx) {
-                      setMedioPagoConfirmado(false);
-                    } else {
-                      setPasoActual(3);
-                    }
-                  }}
+                  onClick={() => setPasoActual(3)}
                 >
                   <ArrowLeft size={16} />
-                  <span>{medioPagoConfirmado && !editandoTx ? 'Medio de pago' : 'Concepto'}</span>
+                  <span>Concepto</span>
                 </button>
                 <div>
                   <span className="wizard-step-kicker" style={{ color: metaCat.color }}>
-                    Paso 4 de 4
+                    {metaCat.nombre}
+                    {subcategoriaActual ? ` › ${nombreSubcategoria(subcategoriaActual.codigo)}` : ''}
+                    {detalleActual ? ` › ${detalleActual.nombre}` : ''}
                   </span>
-                  <h3>{!medioPagoConfirmado ? '¿Con qué medio de pago fue?' : 'Ingresa el Monto'}</h3>
+                  <h3>{editandoTx ? 'Editar movimiento' : verboAccion}</h3>
                 </div>
+              </div>
+
+              {/* Fecha por defecto (editable) */}
+              <div className="discreet-date-wrap">
+                {!mostrarSelectorFecha ? (
+                  <button
+                    type="button"
+                    className="btn-discreet-date"
+                    onClick={() => setMostrarSelectorFecha(true)}
+                    title="Cambiar fecha"
+                  >
+                    <Calendar size={14} />
+                    <span>Fecha: {fecha === hoyISO() ? 'Hoy' : fecha}</span>
+                  </button>
+                ) : (
+                  <input
+                    type="date"
+                    className="input-discreet-date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value || hoyISO())}
+                    onBlur={() => setMostrarSelectorFecha(false)}
+                    autoFocus
+                  />
+                )}
               </div>
             </div>
 
-            {!medioPagoConfirmado ? (
-              /* PRIMERO: SELECCIONAR MEDIO DE PAGO (AL TOCAR UNO, DESAPARECE Y PASA AL MONTO) */
-              <div className="form-block">
-                <div className="medios-chips-grid">
-                  {mediosPago.map((mp) => {
-                    const active = mp.id === medioPagoId;
-                    return (
-                      <button
-                        key={mp.id}
-                        type="button"
-                        className={`medio-chip-btn ${active ? 'active' : ''}`}
-                        onClick={() => {
-                          setMedioPagoId(mp.id);
-                          setMedioPagoConfirmado(true);
-                          setDetalleExpandido(false);
-                          setTimeout(() => montoInputRef.current?.focus(), 80);
-                        }}
-                      >
-                        <MedioPagoIcon nombre={mp.nombre} size={16} />
-                        <span>{nombreMedioPago(mp.nombre)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* MONTO EN SOLES (SIEMPRE VISIBLE Y PROTAGONISTA) */}
-                <div className="form-block amount-highlight-block">
-                  <div
-                    className={`amount-input-box ${errorMsg ? 'amount-error-border' : ''}`}
-                    style={{ borderColor: errorMsg ? '#e11d48' : metaCat.color }}
-                  >
-                    <span className="currency-prefix" style={{ color: metaCat.color }}>S/</span>
-                    <input
-                      ref={montoInputRef}
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={montoStr}
-                      onChange={(e) => {
-                        setErrorMsg('');
-                        const val = e.target.value.replace(/[^0-9.,]/g, '');
-                        setMontoStr(val);
-                      }}
-                      className="amount-direct-input"
-                    />
-                    {montoStr && (
-                      <button
-                        type="button"
-                        className="btn-clear-amount"
-                        onClick={() => setMontoStr('')}
-                        title="Borrar monto"
-                      >
-                        <X size={20} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="quick-add-amounts">
-                    {[10, 20, 50, 100, 200].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        className="quick-amt-chip"
-                        onClick={() => sumarMontoRapido(val)}
-                      >
-                        +S/ {val}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      className="quick-amt-chip toggle-pad"
-                      onClick={() => setMostrarTeclado(!mostrarTeclado)}
-                    >
-                      <Keyboard size={14} />
-                      <span>{mostrarTeclado ? 'Ocultar teclado' : 'Teclado'}</span>
-                    </button>
-                  </div>
-
-                  {mostrarTeclado && (
-                    <div className="numeric-keypad-grid">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'DEL'].map((k) => (
-                        <button
-                          key={k}
-                          type="button"
-                          className={`keypad-key ${k === 'DEL' ? 'key-del' : ''}`}
-                          onClick={() => pulsarTecla(k)}
-                        >
-                          {k === 'DEL' ? <Delete size={18} /> : k}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* DETALLE COLAPSADO POR DEFECTO (RUTA + MEDIO DE PAGO + FECHA + NOTA) */}
-                <div className="wizard-detail-accordion">
+            {/* 1. INGRESE MONTO */}
+            <div className="form-block amount-highlight-block">
+              <label className="reg-step-label">
+                <span className="reg-step-num" style={{ background: metaCat.color }}>1</span>
+                <span>Ingrese monto</span>
+              </label>
+              <div
+                className={`amount-input-box ${errorMsg ? 'amount-error-border' : ''}`}
+                style={{ borderColor: errorMsg ? '#e11d48' : metaCat.color }}
+              >
+                <span className="currency-prefix" style={{ color: metaCat.color }}>S/</span>
+                <input
+                  ref={montoInputRef}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={montoStr}
+                  onChange={(e) => {
+                    setErrorMsg('');
+                    const val = e.target.value.replace(/[^0-9.,]/g, '');
+                    setMontoStr(val);
+                  }}
+                  className="amount-direct-input"
+                />
+                {montoStr && (
                   <button
                     type="button"
-                    className="wizard-detail-toggle"
-                    onClick={() => setDetalleExpandido(!detalleExpandido)}
-                    style={{ borderColor: metaCat.border, background: metaCat.bg }}
+                    className="btn-clear-amount"
+                    onClick={() => setMontoStr('')}
+                    title="Borrar monto"
                   >
-                    <div className="wdt-summary">
-                      <CategoriaIcon codigo={categoriaActual?.codigo} size={15} />
-                      <span className="wdt-text">
-                        <strong>{metaCat.nombre}</strong>
-                        {subcategoriaActual ? ` › ${nombreSubcategoria(subcategoriaActual.codigo)}` : ''}
-                        {detalleActual ? ` › ${detalleActual.nombre}` : ''}
-                        {' · '}
-                        {nombreMedioPago(mediosPago.find((m) => m.id === medioPagoId)?.nombre || '')}
-                        {' · '}
-                        {fecha === hoyISO() ? 'Hoy' : fecha}
-                      </span>
-                    </div>
-                    <span className="wdt-action" style={{ color: metaCat.color }}>
-                      <span>{detalleExpandido ? 'Ocultar' : 'Detalle'}</span>
-                      {detalleExpandido ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                    </span>
+                    <X size={20} />
                   </button>
-
-                  {detalleExpandido && (
-                    <div className="wizard-detail-body">
-                      {/* Ruta clickeable para regresar */}
-                      <div className="sh-breadcrumb-steps">
-                        <button
-                          type="button"
-                          className="sh-pill clickable"
-                          onClick={() => setPasoActual(1)}
-                        >
-                          <CategoriaIcon codigo={categoriaActual?.codigo} size={14} />
-                          <span>{metaCat.nombre}</span>
-                        </button>
-                        <ArrowRight size={13} className="sh-arrow" />
-                        <button
-                          type="button"
-                          className="sh-pill clickable"
-                          onClick={() => setPasoActual(2)}
-                        >
-                          <SubcategoriaIcon
-                            codigo={subcategoriaActual?.codigo}
-                            categoriaCodigo={categoriaActual?.codigo}
-                            size={14}
-                          />
-                          <span>
-                            {subcategoriaActual ? nombreSubcategoria(subcategoriaActual.codigo) : 'Sin rubro'}
-                          </span>
-                        </button>
-                        {detalleActual && (
-                          <>
-                            <ArrowRight size={13} className="sh-arrow" />
-                            <button
-                              type="button"
-                              className="sh-pill strong clickable"
-                              style={{ borderColor: metaCat.color, color: metaCat.color }}
-                              onClick={() => setPasoActual(3)}
-                            >
-                              <ConceptoIcon size={13} color={metaCat.color} />
-                              <span>{detalleActual.nombre}</span>
-                            </button>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Fecha */}
-                      <div className="sh-meta-controls">
-                        <div className="discreet-date-wrap">
-                          {!mostrarSelectorFecha ? (
-                            <button
-                              type="button"
-                              className="btn-discreet-date"
-                              onClick={() => setMostrarSelectorFecha(true)}
-                            >
-                              <Calendar size={13} />
-                              <span>Fecha: {fecha === hoyISO() ? 'Hoy' : fecha}</span>
-                            </button>
-                          ) : (
-                            <input
-                              type="date"
-                              className="input-discreet-date"
-                              value={fecha}
-                              onChange={(e) => setFecha(e.target.value || hoyISO())}
-                              onBlur={() => setMostrarSelectorFecha(false)}
-                            />
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Medio de pago */}
-                      <div className="form-block">
-                        <label className="step-title-inline">
-                          <span>¿Con qué medio de pago fue?</span>
-                        </label>
-                        <div className="medios-chips-grid">
-                          {mediosPago.map((mp) => {
-                            const active = mp.id === medioPagoId;
-                            return (
-                              <button
-                                key={mp.id}
-                                type="button"
-                                className={`medio-chip-btn ${active ? 'active' : ''}`}
-                                onClick={() => setMedioPagoId(mp.id)}
-                              >
-                                <MedioPagoIcon nombre={mp.nombre} size={15} />
-                                <span>{nombreMedioPago(mp.nombre)}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Nota opcional */}
-                      <div className="form-block">
-                        <label>Nota adicional (opcional)</label>
-                        <input
-                          type="text"
-                          className="obs-text-input"
-                          placeholder="Ej. Compras de la semana en Wong, almuerzo familiar..."
-                          value={observaciones}
-                          onChange={(e) => setObservaciones(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {errorMsg && (
-                  <div className="alert-error-box inline-feedback">
-                    <AlertCircle size={18} />
-                    <span>{errorMsg}</span>
-                  </div>
                 )}
+              </div>
 
+              <div className="quick-add-amounts">
+                {[10, 20, 50, 100, 200].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    className="quick-amt-chip"
+                    onClick={() => sumarMontoRapido(val)}
+                  >
+                    +S/ {val}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="quick-amt-chip toggle-pad"
+                  onClick={() => setMostrarTeclado(!mostrarTeclado)}
+                >
+                  <Keyboard size={14} />
+                  <span>{mostrarTeclado ? 'Ocultar teclado' : 'Teclado'}</span>
+                </button>
+              </div>
+
+              {mostrarTeclado && (
+                <div className="numeric-keypad-grid">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'DEL'].map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      className={`keypad-key ${k === 'DEL' ? 'key-del' : ''}`}
+                      onClick={() => pulsarTecla(k)}
+                    >
+                      {k === 'DEL' ? <Delete size={18} /> : k}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Conexión orgánica con Topes Mensuales */}
+              {(() => {
+                if (categoriaActual?.tipo !== 'GASTO') return null;
+                const tope =
+                  presupuestosMensuales.find((p) => p.subcategoriaId === subcategoriaActual?.id) ||
+                  presupuestosMensuales.find((p) => p.categoriaId === categoriaActual?.id && !p.subcategoriaId);
+                if (!tope || !tope.presupuesto) return null;
+                const montoIngresado = parseFloat(String(montoStr).replace(',', '.')) || 0;
+                const realProyectado = editandoTx ? tope.real : tope.real + montoIngresado;
+                const pctProyectado = Math.round((realProyectado / tope.presupuesto) * 100);
+                const estadoProy = pctProyectado > 100 ? 'rojo' : pctProyectado >= 80 ? 'amarillo' : 'verde';
+                return (
+                  <div className={`reg-tope-live-box ${estadoProy}`}>
+                    <div className="rtl-head">
+                      <span>
+                        Tope mensual ({tope.subcategoria ? nombreSubcategoria(tope.subcategoria) : nombreCategoria(tope.categoria)})
+                      </span>
+                      <strong>{pctProyectado}%</strong>
+                    </div>
+                    <div className="ati-progress-track">
+                      <motion.div
+                        className={`ati-progress-fill ${estadoProy}`}
+                        animate={{ width: `${Math.min(pctProyectado, 100)}%` }}
+                        transition={{ duration: 0.25 }}
+                      />
+                    </div>
+                    <small className="rtl-foot">
+                      {formatSoles(realProyectado)} de {formatSoles(tope.presupuesto)}
+                      {pctProyectado > 100
+                        ? ` · Excedería por ${formatSoles(realProyectado - tope.presupuesto)}`
+                        : ` · Quedarían ${formatSoles(tope.presupuesto - realProyectado)}`}
+                    </small>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 2. MEDIO DE PAGO */}
+            <div className="form-block">
+              <label className="reg-step-label">
+                <span className="reg-step-num" style={{ background: metaCat.color }}>2</span>
+                <span>Medio de pago</span>
+              </label>
+              <div className="medios-chips-grid">
+                {mediosPago.map((mp) => {
+                  const active = mp.id === medioPagoId;
+                  return (
+                    <button
+                      key={mp.id}
+                      type="button"
+                      className={`medio-chip-btn ${active ? 'active' : ''}`}
+                      onClick={() => setMedioPagoId(mp.id)}
+                    >
+                      <MedioPagoIcon nombre={mp.nombre} size={15} />
+                      <span>{nombreMedioPago(mp.nombre)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. COMENTARIO */}
+            <div className="form-block">
+              <label className="reg-step-label">
+                <span className="reg-step-num" style={{ background: metaCat.color }}>3</span>
+                <span>Comentario (opcional)</span>
+              </label>
+              <input
+                type="text"
+                className="obs-text-input"
+                placeholder="Ej. Compras de la semana en Wong, almuerzo familiar..."
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+              />
+            </div>
+
+            {/* 4. ADJUNTAR FOTO / PDF */}
+            <div className="form-block">
+              <label className="reg-step-label">
+                <span className="reg-step-num" style={{ background: metaCat.color }}>4</span>
+                <span>Adjuntar foto o PDF (opcional)</span>
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden-file-input"
+                onChange={handleAdjuntoChange}
+              />
+              {!adjunto ? (
+                <button
+                  type="button"
+                  className="btn-attach-file"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip size={17} />
+                  <span>Adjuntar boleta, foto o PDF</span>
+                </button>
+              ) : (
+                <div className="attached-file-pill">
+                  {adjunto.tipo?.startsWith('image/') && adjunto.data ? (
+                    <img src={adjunto.data} alt={adjunto.nombre} className="attached-thumb" />
+                  ) : (
+                    <FileText size={20} className="icon-forest" />
+                  )}
+                  <div className="attached-file-meta">
+                    <strong>{adjunto.nombre}</strong>
+                    <small>{adjunto.tipo === 'application/pdf' ? 'Documento PDF' : 'Imagen adjunta'}</small>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-remove-attach"
+                    onClick={() => {
+                      setAdjunto(null);
+                      setAdjuntoModificado(true);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    title="Quitar adjunto"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {errorMsg && (
+              <div className="alert-error-box inline-feedback">
+                <AlertCircle size={18} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {editandoTx ? (
+              <div className="edit-form-actions-row">
+                <button
+                  type="button"
+                  className="btn-cancel-edit-footer"
+                  onClick={onClearEdit}
+                  disabled={guardando}
+                >
+                  <X size={17} />
+                  <span>Cancelar</span>
+                </button>
                 <button
                   type="submit"
                   className="btn-confirm-transaction"
@@ -1096,19 +1215,27 @@ export default function VistaRegistro({
                   disabled={guardando}
                 >
                   <Sparkles size={19} />
-                  <span>
-                    {guardando
-                      ? 'Guardando...'
-                      : editandoTx
-                        ? 'Guardar Cambios'
-                        : `${verboAccion}${montoStr ? ` por ${formatSoles(String(montoStr).replace(',', '.'))}` : ''}`}
-                  </span>
+                  <span>{guardando ? 'Guardando...' : 'Guardar Cambios'}</span>
                 </button>
-              </>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                className="btn-confirm-transaction"
+                style={{ background: metaCat.color }}
+                disabled={guardando}
+              >
+                <Sparkles size={19} />
+                <span>
+                  {guardando
+                    ? 'Guardando...'
+                    : `${verboAccion}${montoStr ? ` por ${formatSoles(String(montoStr).replace(',', '.'))}` : ''}`}
+                </span>
+              </button>
             )}
           </form>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

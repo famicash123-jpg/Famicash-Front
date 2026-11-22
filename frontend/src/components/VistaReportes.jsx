@@ -2,7 +2,7 @@
 // Vista de Reportes, Evolución Mensual en Barras Numeradas y
 // Desglose por Área → Rubro → Concepto con nombres amigables
 // ============================================================
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,7 +12,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  LabelList
+  LabelList,
+  ReferenceArea
 } from 'recharts';
 import {
   ChevronRight,
@@ -26,8 +27,10 @@ import {
   ListFilter,
   Home,
   UtensilsCrossed,
-  Tag
+  Tag,
+  Table2
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api';
 import {
   formatSoles,
@@ -38,7 +41,8 @@ import {
   etiquetaCategoria,
   nombreSubcategoria,
   etiquetaSubcategoria,
-  nombreMedioPago
+  nombreMedioPago,
+  periodoActual
 } from '../utils/format';
 import TablaDinamica from './TablaDinamica';
 import { CategoriaIcon, SubcategoriaIcon, MedioPagoIcon } from './IconoFamicash';
@@ -64,20 +68,82 @@ export default function VistaReportes({
   onQuickAddTransaccion,
   refreshKey
 }) {
-  // Por defecto la Tabla Dinámica predomina arriba y los demás gráficos salen colapsados
-  const [mostrarEvolucion, setMostrarEvolucion] = useState(false);
+  // Gráfico 1 (3 barras: Ingresos, Gastos, Disponible) y Gráfico 2 (Ahorro) abiertos;
+  // Tabla Dinámica tercera y colapsada por defecto.
+  const [mostrarEvolucion, setMostrarEvolucion] = useState(true);
+  const [mostrarAhorroMes, setMostrarAhorroMes] = useState(true);
+  const [mostrarTablaDinamica, setMostrarTablaDinamica] = useState(false);
   const [mostrarRankingHistorial, setMostrarRankingHistorial] = useState(Boolean(drillInicial));
 
   const [rangoEvolutivo, setRangoEvolutivo] = useState('6M');
   const [anioEvolutivo, setAnioEvolutivo] = useState(new Date().getFullYear());
   const [desdeMes, setDesdeMes] = useState(`${new Date().getFullYear()}-01`);
   const [hastaMes, setHastaMes] = useState(`${new Date().getFullYear()}-12`);
+
+  // Sincronizar los gráficos de barras cuando cambia Mensual / Trimestral / Anual en BarraPeriodo
+  useEffect(() => {
+    if (!periodoClave) return;
+    if (periodoTipo === 'ANUAL') {
+      const y = parseInt(periodoClave, 10) || new Date().getFullYear();
+      setAnioEvolutivo(y);
+      setRangoEvolutivo('ANIO');
+    } else if (periodoTipo === 'TRIMESTRAL') {
+      const m = /^(\d{4})-Q([1-4])$/i.exec(periodoClave);
+      if (m) {
+        const y = Number(m[1]);
+        const q = Number(m[2]);
+        const iniM = String((q - 1) * 3 + 1).padStart(2, '0');
+        const finM = String(q * 3).padStart(2, '0');
+        setDesdeMes(`${y}-${iniM}`);
+        setHastaMes(`${y}-${finM}`);
+        setRangoEvolutivo('PERSONALIZADO');
+      }
+    } else if (periodoTipo === 'MENSUAL') {
+      const m = /^(\d{4})-(\d{2})$/.exec(periodoClave);
+      if (m) {
+        const y = Number(m[1]);
+        const mesIdx = Number(m[2]) - 1;
+        const dIni = new Date(Date.UTC(y, mesIdx - 5, 1));
+        const dIniStr = `${dIni.getUTCFullYear()}-${String(dIni.getUTCMonth() + 1).padStart(2, '0')}`;
+        setDesdeMes(dIniStr);
+        setHastaMes(periodoClave);
+        setRangoEvolutivo('PERSONALIZADO');
+      }
+    }
+  }, [periodoTipo, periodoClave]);
   const [seriesActivas, setSeriesActivas] = useState({
     ingresos: true,
     gastos: true,
+    disponible: true,
     ahorro: true
   });
-  const [evolutivo, setEvolutivo] = useState({ meses: [], totales: { ingresos: 0, gastos: 0, ahorro: 0 } });
+  const [evolutivo, setEvolutivo] = useState({
+    meses: [],
+    totales: { ingresos: 0, gastos: 0, disponible: 0, ahorro: 0 }
+  });
+
+  const scrollChart1Ref = useRef(null);
+  const scrollChart2Ref = useRef(null);
+  const mesActualClave = periodoActual('MENSUAL');
+  const etiquetaMesActual = evolutivo.meses?.find((m) => m.mes === mesActualClave)?.etiqueta || null;
+
+  useEffect(() => {
+    const centrarMesActual = (el) => {
+      if (!el) return;
+      const idx = (evolutivo.meses || []).findIndex((m) => m.mes === mesActualClave);
+      if (idx >= 0 && evolutivo.meses.length > 0) {
+        const ratio = (idx + 1) / evolutivo.meses.length;
+        el.scrollLeft = Math.max(0, el.scrollWidth * ratio - el.clientWidth + 40);
+      } else {
+        el.scrollLeft = el.scrollWidth;
+      }
+    };
+    const t = setTimeout(() => {
+      centrarMesActual(scrollChart1Ref.current);
+      centrarMesActual(scrollChart2Ref.current);
+    }, 80);
+    return () => clearTimeout(t);
+  }, [evolutivo.meses, mesActualClave, mostrarEvolucion, mostrarAhorroMes]);
 
   const [nivelVista, setNivelVista] = useState('categoria');
   const [tipoMovimientoNivel, setTipoMovimientoNivel] = useState('GASTO');
@@ -126,7 +192,25 @@ export default function VistaReportes({
         api.getPorNivel({ ...baseQuery, nivel: nivelVista, tipo: tipoMovimientoNivel })
       ]);
 
-      setEvolutivo(resEvo);
+      const mesesConDisp = (resEvo?.meses || []).map((m) => ({
+        ...m,
+        disponible:
+          m.disponible !== undefined
+            ? m.disponible
+            : Math.round(((m.ingresos || 0) - (m.gastos || 0)) * 100) / 100
+      }));
+      const totEvo = resEvo?.totales || { ingresos: 0, gastos: 0, ahorro: 0 };
+      setEvolutivo({
+        ...resEvo,
+        meses: mesesConDisp,
+        totales: {
+          ...totEvo,
+          disponible:
+            totEvo.disponible !== undefined
+              ? totEvo.disponible
+              : Math.round(((totEvo.ingresos || 0) - (totEvo.gastos || 0)) * 100) / 100
+        }
+      });
       setPorNivel(resNivel);
 
       const resTx = await api.getTransacciones({
@@ -186,24 +270,7 @@ export default function VistaReportes({
   return (
     <div className="reports-view-container">
       {/* ============================================================
-          1. TABLA DINÁMICA ESTILO EXCEL (PREDOMINANTE ARRIBA)
-          ============================================================ */}
-      <div className="panel-card">
-        <TablaDinamica
-          transacciones={txFiltradas.items || []}
-          taxonomia={taxonomia}
-          mediosPago={mediosPago}
-          periodoEtiqueta={porNivel?.periodo?.etiqueta}
-          onEditTransaccion={onEditTransaccion}
-          onDeleteTransaccion={(txOrId) =>
-            onDeleteTransaccion(typeof txOrId === 'object' ? txOrId.id : txOrId)
-          }
-          onQuickAddTransaccion={onQuickAddTransaccion}
-        />
-      </div>
-
-      {/* ============================================================
-          2. EVOLUCIÓN MENSUAL EN BARRAS (COLAPSADA POR DEFECTO)
+          1. EVOLUCIÓN MENSUAL EN BARRAS (GRÁFICO PRINCIPAL, ABIERTO)
           ============================================================ */}
       <div className="panel-card">
         <button
@@ -214,8 +281,8 @@ export default function VistaReportes({
           <div className="section-title-with-icon">
             <BarChart3 size={20} className="icon-forest" />
             <div className="rat-texts">
-              <h3>Evolución Mes a Mes (Gráfico de barras)</h3>
-              <small>Compara ingresos, gastos y ahorros por mes</small>
+              <h3>1. Disponible (Ingreso − Gasto) — 3 barras por mes</h3>
+              <small>Compara ingresos, gastos y disponible mes a mes</small>
             </div>
           </div>
           <span className="rat-pill">
@@ -224,71 +291,16 @@ export default function VistaReportes({
           </span>
         </button>
 
+        <AnimatePresence initial={false}>
         {mostrarEvolucion && (
-          <div className="report-accordion-body">
-            <div className="panel-card-header wrap-header">
-              <div className="evo-controls-row">
-            <div className="segmented-pills">
-              <button
-                type="button"
-                className={rangoEvolutivo === '6M' ? 'active' : ''}
-                onClick={() => setRangoEvolutivo('6M')}
-              >
-                6 meses
-              </button>
-              <button
-                type="button"
-                className={rangoEvolutivo === 'ANIO' ? 'active' : ''}
-                onClick={() => setRangoEvolutivo('ANIO')}
-              >
-                Año {anioEvolutivo}
-              </button>
-              <button
-                type="button"
-                className={rangoEvolutivo === '12M' ? 'active' : ''}
-                onClick={() => setRangoEvolutivo('12M')}
-              >
-                12 meses
-              </button>
-              <button
-                type="button"
-                className={rangoEvolutivo === 'PERSONALIZADO' ? 'active' : ''}
-                onClick={() => setRangoEvolutivo('PERSONALIZADO')}
-              >
-                Rango
-              </button>
-            </div>
-
-            {rangoEvolutivo === 'ANIO' && (
-              <select
-                className="compact-select"
-                value={anioEvolutivo}
-                onChange={(e) => setAnioEvolutivo(Number(e.target.value))}
-              >
-                {[2024, 2025, 2026, 2027].map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            )}
-
-            {rangoEvolutivo === 'PERSONALIZADO' && (
-              <div className="custom-month-range">
-                <input
-                  type="month"
-                  value={desdeMes}
-                  onChange={(e) => setDesdeMes(e.target.value)}
-                />
-                <span>a</span>
-                <input
-                  type="month"
-                  value={hastaMes}
-                  onChange={(e) => setHastaMes(e.target.value)}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
+          <motion.div
+            className="report-accordion-body"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            style={{ overflow: 'hidden' }}
+          >
         <div className="evo-series-toggles">
           <button
             type="button"
@@ -308,28 +320,78 @@ export default function VistaReportes({
           </button>
           <button
             type="button"
-            className={`serie-toggle-pill ahorro ${seriesActivas.ahorro ? 'on' : 'off'}`}
-            onClick={() => toggleSerie('ahorro')}
+            className={`serie-toggle-pill disponible ${seriesActivas.disponible ? 'on' : 'off'}`}
+            onClick={() => toggleSerie('disponible')}
           >
-            <span className="dot" style={{ background: '#0284c7' }} />
-            <span>Ahorro: <strong>{formatSoles(evolutivo.totales?.ahorro, 0)}</strong></span>
+            <span className="dot" style={{ background: '#6366f1' }} />
+            <span>Disponible: <strong>{formatSoles(evolutivo.totales?.disponible, 0)}</strong></span>
           </button>
         </div>
 
-        <div className="bar-chart-wrapper">
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="bar-chart-scroll-x" ref={scrollChart1Ref}>
+          <div
+            className="bar-chart-inner"
+            style={{ minWidth: `${Math.max((evolutivo.meses?.length || 6) * 155, 560)}px` }}
+          >
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart
               data={evolutivo.meses || []}
-              margin={{ top: 24, right: 8, left: 0, bottom: 4 }}
+              margin={{ top: 28, right: 16, left: 0, bottom: 8 }}
+              barGap={6}
+              barCategoryGap="20%"
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="etiqueta" tick={{ fontSize: 11, fontWeight: 700 }} />
+              {etiquetaMesActual && (
+                <ReferenceArea
+                  x1={etiquetaMesActual}
+                  x2={etiquetaMesActual}
+                  fill="#ecfdf5"
+                  fillOpacity={0.85}
+                  stroke="#10b981"
+                  strokeOpacity={0.3}
+                  strokeDasharray="4 4"
+                />
+              )}
+              <XAxis
+                dataKey="etiqueta"
+                tick={({ x, y, payload }) => {
+                  const esActual = payload.value === etiquetaMesActual;
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      <text
+                        x={0}
+                        y={0}
+                        dy={14}
+                        textAnchor="middle"
+                        fill={esActual ? '#047857' : '#475569'}
+                        fontSize={esActual ? 12.5 : 11.5}
+                        fontWeight={esActual ? 800 : 700}
+                      >
+                        {payload.value}
+                      </text>
+                      {esActual && (
+                        <text
+                          x={0}
+                          y={26}
+                          textAnchor="middle"
+                          fill="#059669"
+                          fontSize={9.5}
+                          fontWeight={800}
+                        >
+                          ● Actual
+                        </text>
+                      )}
+                    </g>
+                  );
+                }}
+                height={42}
+              />
               <YAxis
-                width={46}
+                width={48}
                 tickFormatter={(v) =>
-                  v >= 1000 ? `S/${(Number(v) / 1000).toFixed(0)}k` : `S/${v}`
+                  v >= 1000 || v <= -1000 ? `S/${(Number(v) / 1000).toFixed(0)}k` : `S/${v}`
                 }
-                tick={{ fontSize: 10.5 }}
+                tick={{ fontSize: 11 }}
               />
               <Tooltip
                 formatter={(value) => formatSoles(value)}
@@ -338,441 +400,201 @@ export default function VistaReportes({
               <Legend wrapperStyle={{ paddingTop: '10px', fontWeight: 600 }} />
 
               {seriesActivas.ingresos && (
-                <Bar dataKey="ingresos" name="Ingresos" fill="#059669" radius={[6, 6, 0, 0]}>
+                <Bar dataKey="ingresos" name="Ingresos" fill="#059669" barSize={28} radius={[7, 7, 0, 0]} animationDuration={600}>
                   <LabelList
                     dataKey="ingresos"
                     position="top"
                     formatter={formatSolesEntero}
-                    style={{ fontSize: '10.5px', fontWeight: 700, fill: '#065f46' }}
+                    style={{ fontSize: '12px', fontWeight: 800, fill: '#065f46' }}
                   />
                 </Bar>
               )}
 
               {seriesActivas.gastos && (
-                <Bar dataKey="gastos" name="Gastos" fill="#e11d48" radius={[6, 6, 0, 0]}>
+                <Bar dataKey="gastos" name="Gastos" fill="#e11d48" barSize={28} radius={[7, 7, 0, 0]} animationDuration={600}>
                   <LabelList
                     dataKey="gastos"
                     position="top"
                     formatter={formatSolesEntero}
-                    style={{ fontSize: '10.5px', fontWeight: 700, fill: '#9f1239' }}
+                    style={{ fontSize: '12px', fontWeight: 800, fill: '#9f1239' }}
                   />
                 </Bar>
               )}
 
-              {seriesActivas.ahorro && (
-                <Bar dataKey="ahorro" name="Ahorro" fill="#0284c7" radius={[6, 6, 0, 0]}>
+              {seriesActivas.disponible && (
+                <Bar dataKey="disponible" name="Disponible" fill="#6366f1" barSize={28} radius={[7, 7, 0, 0]} animationDuration={600}>
                   <LabelList
-                    dataKey="ahorro"
+                    dataKey="disponible"
                     position="top"
                     formatter={formatSolesEntero}
-                    style={{ fontSize: '10.5px', fontWeight: 700, fill: '#075985' }}
+                    style={{ fontSize: '12px', fontWeight: 800, fill: '#3730a3' }}
                   />
                 </Bar>
               )}
             </BarChart>
           </ResponsiveContainer>
-        </div>
           </div>
+        </div>
+        <p className="chart-scroll-hint">Desliza horizontalmente para ver otros meses</p>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* ============================================================
-          3. RANKING E HISTORIAL DETALLADO (COLAPSADO POR DEFECTO)
+          2. GRÁFICO 2: AHORRO EN BARRAS POR MES
           ============================================================ */}
       <div className="panel-card">
         <button
           type="button"
           className="report-accordion-toggle"
-          onClick={() => setMostrarRankingHistorial(!mostrarRankingHistorial)}
+          onClick={() => setMostrarAhorroMes(!mostrarAhorroMes)}
         >
           <div className="section-title-with-icon">
-            <Layers size={19} className="icon-forest" />
+            <BarChart3 size={20} style={{ color: '#0284c7' }} />
             <div className="rat-texts">
-              <h3>Ranking por Área y Lista de Movimientos ({txFiltradas.total || 0})</h3>
-              <small>Desglose con barras de porcentaje e historial completo</small>
+              <h3>2. Ahorro en barras por mes</h3>
+              <small>Total ahorrado en el rango: {formatSoles(evolutivo.totales?.ahorro, 0)}</small>
             </div>
           </div>
           <span className="rat-pill">
-            <span>{mostrarRankingHistorial ? 'Ocultar' : 'Ver detalle'}</span>
-            {mostrarRankingHistorial ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <span>{mostrarAhorroMes ? 'Ocultar' : 'Ver gráfico'}</span>
+            {mostrarAhorroMes ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </span>
         </button>
-      </div>
 
-      {mostrarRankingHistorial && (
-      <div className="reports-two-cols">
-        <div className="panel-card">
-          {!drill ? (
-            <>
-              <div className="panel-card-header wrap-header">
-                <div>
-                  <div className="section-title-with-icon">
-                    <Layers size={19} className="icon-forest" />
-                    <h3>Ranking de Gastos por Área, Rubro y Concepto</h3>
-                  </div>
-                  <p>
-                    Total en {porNivel?.periodo?.etiqueta}: <strong>{formatSoles(porNivel.total)}</strong>
-                  </p>
-                </div>
-
-                <div className="segmented-pills">
-                  {['GASTO', 'INGRESO', 'AHORRO'].map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      className={tipoMovimientoNivel === t ? 'active' : ''}
-                      onClick={() => setTipoMovimientoNivel(t)}
-                    >
-                      {t === 'GASTO' ? 'Gastos' : t === 'INGRESO' ? 'Ingresos' : 'Ahorros'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="level-tabs-bar">
-                {[
-                  { id: 'categoria', label: 'Por Área Familiar', Icon: Home },
-                  { id: 'subcategoria', label: 'Por Rubro', Icon: UtensilsCrossed },
-                  { id: 'detalle', label: 'Por Concepto', Icon: Tag }
-                ].map((tab) => {
-                  const TabIcon = tab.Icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      className={`level-tab-btn ${nivelVista === tab.id ? 'active' : ''}`}
-                      onClick={() => setNivelVista(tab.id)}
-                    >
-                      <TabIcon size={14} />
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {porNivel.items?.length === 0 ? (
-                <div className="empty-state-box">No hay registros para este filtro.</div>
-              ) : (
-                <div className="breakdown-rows-list">
-                  {porNivel.items.map((item) => {
-                    const meta = getMetaCategoria(item.padre || item.nombre);
-                    const etiquetaLimpia = formatearNombreNivel(nivelVista, item.nombre);
-                    const padreLimpio = item.padre
-                      ? nivelVista === 'subcategoria'
-                        ? nombreCategoria(item.padre)
-                        : nombreSubcategoria(item.padre)
-                      : '';
-                    return (
-                      <button
-                        key={`${nivelVista}-${item.id}`}
-                        type="button"
-                        className="breakdown-row-btn"
-                        onClick={() => {
-                          if (nivelVista === 'categoria' || nivelVista === 'subcategoria') {
-                            setDrill({
-                              nivel: nivelVista,
-                              id: item.id,
-                              nombre: item.nombre,
-                              padre: item.padre,
-                              monto: item.monto,
-                              pct: item.pct
-                            });
-                            setDrillTab('subcategorias');
-                            setVerTodasTx(false);
-                          } else if (item.id) {
-                            setFiltros({ ...filtros, detalleIds: [item.id] });
-                          }
-                        }}
-                      >
-                        <div className="br-left">
-                          <span className="br-color-bar" style={{ background: meta.color }} />
-                          <div>
-                            <strong className="br-name">{etiquetaLimpia}</strong>
-                            <small className="br-meta">
-                              {padreLimpio ? `${padreLimpio} · ` : ''}
-                              {item.cantidad} registros
-                            </small>
-                          </div>
-                        </div>
-
-                        <div className="br-right">
-                          <div className="br-amount-line">
-                            <strong>{formatSoles(item.monto)}</strong>
-                            <span className="br-pct-pill">{item.pct}%</span>
-                          </div>
-                          <div className="br-progress-track">
-                            <div
-                              className="br-progress-fill"
-                              style={{ width: `${Math.min(item.pct, 100)}%`, background: meta.color }}
-                            />
-                          </div>
-                        </div>
-
-                        <ChevronRight size={17} className="br-chevron" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="drilldown-container">
-              <div className="drilldown-top-bar">
-                <button
-                  type="button"
-                  className="btn-back-drill"
-                  onClick={() => setDrill(null)}
+        <AnimatePresence initial={false}>
+        {mostrarAhorroMes && (
+          <motion.div
+            className="report-accordion-body"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="bar-chart-scroll-x" ref={scrollChart2Ref}>
+              <div
+                className="bar-chart-inner"
+                style={{ minWidth: `${Math.max((evolutivo.meses?.length || 6) * 100, 440)}px` }}
+              >
+              <ResponsiveContainer width="100%" height={265}>
+                <BarChart
+                  data={evolutivo.meses || []}
+                  margin={{ top: 28, right: 16, left: 0, bottom: 8 }}
                 >
-                  <ArrowLeft size={16} />
-                  <span>Volver atrás</span>
-                </button>
-              </div>
-
-              <div className="drilldown-hero-card">
-                <div>
-                  <span className="drill-eyebrow">
-                    {drill.padre ? `${nombreCategoria(drill.padre)} › ` : ''}
-                    Detalle en {porNivel?.periodo?.etiqueta}
-                  </span>
-                  <h3>{formatearNombreNivel(drill.nivel, drill.nombre)}</h3>
-                </div>
-                <div className="drill-hero-numbers">
-                  <strong>{formatSoles(drill.monto)}</strong>
-                  <span>{drill.pct}% del total</span>
-                </div>
-              </div>
-
-              <div className="level-tabs-bar">
-                <button
-                  type="button"
-                  className={`level-tab-btn ${drillTab === 'subcategorias' ? 'active' : ''}`}
-                  onClick={() => setDrillTab('subcategorias')}
-                >
-                  {drill.nivel === 'categoria' ? 'Rubros' : 'Conceptos'} ({drillSubitems.length})
-                </button>
-                <button
-                  type="button"
-                  className={`level-tab-btn ${drillTab === 'transacciones' ? 'active' : ''}`}
-                  onClick={() => setDrillTab('transacciones')}
-                >
-                  Movimientos ({drillTransacciones.length})
-                </button>
-              </div>
-
-              {drillTab === 'subcategorias' && (
-                <div className="breakdown-rows-list">
-                  {drillSubitems.map((sub) => {
-                    const subNivel = drill.nivel === 'categoria' ? 'subcategoria' : 'detalle';
-                    return (
-                      <button
-                        key={sub.id}
-                        type="button"
-                        className="breakdown-row-btn"
-                        onClick={() => {
-                          if (drill.nivel === 'categoria') {
-                            setDrill({
-                              nivel: 'subcategoria',
-                              id: sub.id,
-                              nombre: sub.nombre,
-                              padre: drill.nombre,
-                              monto: sub.monto,
-                              pct: sub.pct
-                            });
-                          } else {
-                            setDrillTab('transacciones');
-                          }
-                        }}
-                      >
-                        <div className="br-left">
-                          <div>
-                            <strong className="br-name">
-                              {formatearNombreNivel(subNivel, sub.nombre)}
-                            </strong>
-                            <small className="br-meta">{sub.cantidad} movimientos</small>
-                          </div>
-                        </div>
-                        <div className="br-right">
-                          <div className="br-amount-line">
-                            <strong>{formatSoles(sub.monto)}</strong>
-                            <span className="br-pct-pill">{sub.pct}%</span>
-                          </div>
-                        </div>
-                        <ChevronRight size={16} className="br-chevron" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="drill-tx-section">
-                <div className="drill-tx-header">
-                  <h4>{drillTab === 'transacciones' ? 'Todos los movimientos' : 'Últimos movimientos'}</h4>
-                  {drillTransacciones.length > 5 && drillTab !== 'transacciones' && (
-                    <button
-                      type="button"
-                      className="btn-link-subtle"
-                      onClick={() => {
-                        setVerTodasTx(true);
-                        setDrillTab('transacciones');
-                      }}
-                    >
-                      Ver todos ({drillTransacciones.length}) →
-                    </button>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  {etiquetaMesActual && (
+                    <ReferenceArea
+                      x1={etiquetaMesActual}
+                      x2={etiquetaMesActual}
+                      fill="#f0f9ff"
+                      fillOpacity={0.85}
+                      stroke="#0284c7"
+                      strokeOpacity={0.3}
+                      strokeDasharray="4 4"
+                    />
                   )}
-                </div>
-
-                <div className="tx-compact-list">
-                  {(drillTab === 'transacciones' || verTodasTx
-                    ? drillTransacciones
-                    : drillTransacciones.slice(0, 5)
-                  ).map((tx) => (
-                    <div key={tx.id} className="tx-row-item">
-                      <div className="tx-badge-cat">{formatFechaCorta(tx.fecha)}</div>
-                      <div className="tx-main-info">
-                        <div className="tx-title-line">
-                          <SubcategoriaIcon
-                            codigo={tx.subcategoria}
-                            categoriaCodigo={tx.categoria}
-                            size={14}
-                          />
-                          <strong>{tx.detalle || nombreSubcategoria(tx.subcategoria)}</strong>
-                        </div>
-                        <div className="tx-sub-line">
-                          <span>{nombreSubcategoria(tx.subcategoria)}</span>
-                          {tx.medioPago && (
-                            <>
-                              <span>·</span>
-                              <span className="tx-medio-tag">
-                                <MedioPagoIcon nombre={tx.medioPago} size={12} />
-                                {nombreMedioPago(tx.medioPago)}
-                              </span>
-                            </>
+                  <XAxis
+                    dataKey="etiqueta"
+                    tick={({ x, y, payload }) => {
+                      const esActual = payload.value === etiquetaMesActual;
+                      return (
+                        <g transform={`translate(${x},${y})`}>
+                          <text
+                            x={0}
+                            y={0}
+                            dy={14}
+                            textAnchor="middle"
+                            fill={esActual ? '#0369a1' : '#475569'}
+                            fontSize={esActual ? 12.5 : 11.5}
+                            fontWeight={esActual ? 800 : 700}
+                          >
+                            {payload.value}
+                          </text>
+                          {esActual && (
+                            <text
+                              x={0}
+                              y={26}
+                              textAnchor="middle"
+                              fill="#0284c7"
+                              fontSize={9.5}
+                              fontWeight={800}
+                            >
+                              ● Actual
+                            </text>
                           )}
-                        </div>
-                        {tx.observaciones && <div className="tx-obs-line">“{tx.observaciones}”</div>}
-                      </div>
-                      <div className="tx-right-col">
-                        <span className={`tx-amount-val ${tx.tipo.toLowerCase()}`}>
-                          {formatSoles(tx.monto)}
-                        </span>
-                        <div className="tx-row-actions">
-                          <button
-                            type="button"
-                            className="tx-icon-btn"
-                            onClick={() => onEditTransaccion(tx)}
-                            title="Editar"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="tx-icon-btn danger"
-                            onClick={() => onDeleteTransaccion(tx.id)}
-                            title="Eliminar"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        </g>
+                      );
+                    }}
+                    height={42}
+                  />
+                  <YAxis
+                    width={48}
+                    tickFormatter={(v) =>
+                      v >= 1000 ? `S/${(Number(v) / 1000).toFixed(0)}k` : `S/${v}`
+                    }
+                    tick={{ fontSize: 11 }}
+                  />
+                  <Tooltip
+                    formatter={(value) => formatSoles(value)}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #cbd5e1' }}
+                  />
+                  <Bar dataKey="ahorro" name="Ahorro" fill="#0284c7" barSize={42} radius={[8, 8, 0, 0]} animationDuration={650}>
+                    <LabelList
+                      dataKey="ahorro"
+                      position="top"
+                      formatter={formatSolesEntero}
+                      style={{ fontSize: '12.5px', fontWeight: 800, fill: '#075985' }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
               </div>
             </div>
-          )}
-        </div>
+          </motion.div>
+        )}
+        </AnimatePresence>
+      </div>
 
-        {/* Panel Derecho: Historial Filtrado Completo */}
-        <div className="panel-card">
-          <div className="panel-card-header">
-            <div>
-              <div className="section-title-with-icon">
-                <ListFilter size={19} className="icon-forest" />
-                <h3>Historial de Movimientos ({txFiltradas.total || 0})</h3>
-              </div>
-              <p>
-                Ingresos: <strong>{formatSoles(txFiltradas.totales?.INGRESO)}</strong> · Gastos:{' '}
-                <strong>{formatSoles(txFiltradas.totales?.GASTO)}</strong> · Ahorro:{' '}
-                <strong>{formatSoles(txFiltradas.totales?.AHORRO)}</strong>
-              </p>
+      {/* ============================================================
+          2. TABLA DINÁMICA DE RESUMEN (SEGUNDA Y COLAPSADA POR DEFECTO)
+          ============================================================ */}
+      <div className="panel-card">
+        <button
+          type="button"
+          className="report-accordion-toggle"
+          onClick={() => setMostrarTablaDinamica(!mostrarTablaDinamica)}
+        >
+          <div className="section-title-with-icon">
+            <Table2 size={20} className="icon-forest" />
+            <div className="rat-texts">
+              <h3>Tabla Dinámica de Resumen</h3>
+              <small>Desglose interactivo por Área, Rubro y Concepto ({txFiltradas.total || 0} movimientos)</small>
             </div>
           </div>
+          <span className="rat-pill">
+            <span>{mostrarTablaDinamica ? 'Ocultar' : 'Ver tabla'}</span>
+            {mostrarTablaDinamica ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </button>
 
-          {txFiltradas.items?.length === 0 ? (
-            <div className="empty-state-box">No hay movimientos que coincidan con los filtros.</div>
-          ) : (
-            <div className="tx-compact-list scrollable-tx-list">
-              {txFiltradas.items.map((tx) => {
-                const meta = getMetaCategoria(tx.categoria);
-                return (
-                  <div key={tx.id} className="tx-row-item">
-                    <div
-                      className="tx-badge-cat"
-                      style={{ background: meta.bg, color: meta.color, borderColor: meta.border }}
-                    >
-                      {formatFechaCorta(tx.fecha)}
-                    </div>
-                    <div className="tx-main-info">
-                      <div className="tx-title-line">
-                        <SubcategoriaIcon
-                          codigo={tx.subcategoria}
-                          categoriaCodigo={tx.categoria}
-                          size={15}
-                        />
-                        <strong>{tx.detalle || nombreSubcategoria(tx.subcategoria)}</strong>
-                        <span className="tx-person-tag">{tx.persona}</span>
-                      </div>
-                      <div className="tx-sub-line">
-                        <span className="tx-cat-inline">
-                          <CategoriaIcon codigo={tx.categoria} size={13} />
-                          {nombreCategoria(tx.categoria)}
-                        </span>
-                        <span>›</span>
-                        <span>{nombreSubcategoria(tx.subcategoria)}</span>
-                        {tx.medioPago && (
-                          <>
-                            <span>·</span>
-                            <span className="tx-medio-tag">
-                              <MedioPagoIcon nombre={tx.medioPago} size={12} />
-                              {nombreMedioPago(tx.medioPago)}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {tx.observaciones && <div className="tx-obs-line">“{tx.observaciones}”</div>}
-                    </div>
-                    <div className="tx-right-col">
-                      <span className={`tx-amount-val ${tx.tipo.toLowerCase()}`}>
-                        {tx.tipo === 'GASTO' ? '-' : '+'}
-                        {formatSoles(tx.monto)}
-                      </span>
-                      <div className="tx-row-actions">
-                        <button
-                          type="button"
-                          className="tx-icon-btn"
-                          onClick={() => onEditTransaccion(tx)}
-                          title="Editar movimiento"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="tx-icon-btn danger"
-                          onClick={() => onDeleteTransaccion(tx.id)}
-                          title="Eliminar movimiento"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        {mostrarTablaDinamica && (
+          <div className="report-accordion-body">
+            <TablaDinamica
+              transacciones={txFiltradas.items || []}
+              taxonomia={taxonomia}
+              mediosPago={mediosPago}
+              periodoEtiqueta={porNivel?.periodo?.etiqueta}
+              onEditTransaccion={onEditTransaccion}
+              onDeleteTransaccion={(txOrId) =>
+                onDeleteTransaccion(typeof txOrId === 'object' ? txOrId.id : txOrId)
+              }
+              onQuickAddTransaccion={onQuickAddTransaccion}
+            />
+          </div>
+        )}
       </div>
-      )}
     </div>
   );
 }

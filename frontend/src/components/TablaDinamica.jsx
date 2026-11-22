@@ -335,7 +335,7 @@ export default function TablaDinamica({
             <span>
               Tienes <strong>{totalPendientesHogar}</strong>{' '}
               {totalPendientesHogar === 1 ? 'gasto fijo' : 'gastos fijos'} de{' '}
-              <strong>Hogar y Familia</strong> sin monto este periodo.
+              <strong>Generales</strong> sin monto este periodo.
             </span>
           </div>
           <button type="button" className="pha-btn" onClick={expandirPendientesHogar}>

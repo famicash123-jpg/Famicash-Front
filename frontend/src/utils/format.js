@@ -108,14 +108,14 @@ export const CATEGORIA_META = {
     badge: 'Ingreso'
   },
   II_GENERALES: {
-    nombre: 'Hogar y Familia',
+    nombre: 'Generales',
     descripcion: 'Comida, casa, luz, transporte',
     emoji: '🏠',
     color: '#0284c7',
     bg: '#f0f9ff',
     border: '#bae6fd',
-    alias: 'Gastos del Hogar',
-    badge: 'Hogar'
+    alias: 'Generales',
+    badge: 'Generales'
   },
   III_LARA: {
     nombre: 'Lara',
@@ -148,23 +148,23 @@ export const CATEGORIA_META = {
     badge: 'Anthony'
   },
   '0_AHORRO': {
-    nombre: 'Ahorros',
+    nombre: 'Ahorro',
     descripcion: 'Dinero guardado para metas',
     emoji: '🐷',
     color: '#0d9488',
     bg: '#f0fdfa',
     border: '#99f6e4',
-    alias: 'Ahorro Familiar',
+    alias: 'Ahorro',
     badge: 'Ahorro'
   },
   VI_AHORRO: {
-    nombre: 'Ahorros',
+    nombre: 'Ahorro',
     descripcion: 'Dinero guardado para metas',
     emoji: '🐷',
     color: '#0d9488',
     bg: '#f0fdfa',
     border: '#99f6e4',
-    alias: 'Ahorro Familiar',
+    alias: 'Ahorro',
     badge: 'Ahorro'
   }
 };

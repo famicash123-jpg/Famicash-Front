@@ -89,10 +89,43 @@ const SUBCATEGORIA_ICON_MAP = {
   '_5_VESTIMENTA_ANTHONY': Shirt,
   '_6_DIVERSION_ANTHONY': Compass,
 
-  // VI_AHORRO
+  // VI_AHORRO / 0_AHORRO
   '_1_AHORRO_VANESSA': Landmark,
   '_2_AHORRO_ANTHONY': Landmark,
-  '_3_AHORRO LARA': PiggyBank
+  '_3_AHORRO LARA': PiggyBank,
+
+  // Nombres limpios de subcategorías
+  'Ahorro Vanessa': Landmark,
+  'Ahorro Anthony': Landmark,
+  Sueldos: Banknote,
+  Pensión: HeartHandshake,
+  'Ingreso Adicional 1': Sparkles,
+  'Ingreso Adicional 2': Sparkles,
+  Vivienda: Building2,
+  Mantenimiento: Droplets,
+  'Servicios Básicos': Zap,
+  Transporte: Car,
+  'Personal de Servicio': Brush,
+  Alimentación: UtensilsCrossed,
+  'Cuidado Personal Lara': Heart,
+  'Educación Lara': GraduationCap,
+  'Talleres Lara': Palette,
+  'Vestimenta Lara': Shirt,
+  'Salud Lara': Stethoscope,
+  'Diversión Lara': PartyPopper,
+  'Cuidado Personal Vanessa': Scissors,
+  'Deporte Vanessa': Dumbbell,
+  'Salud Vanessa': Pill,
+  'Estudios Vanessa': BookOpen,
+  'Vestimenta Vanessa': ShoppingBag,
+  'Legal Vanessa': Scale,
+  'Diversión Vanessa': Plane,
+  'Cuidado Personal Anthony': Scissors,
+  'Deporte Anthony': Dumbbell,
+  'Salud Anthony': Stethoscope,
+  'Estudios Anthony': BookOpen,
+  'Vestimenta Anthony': Shirt,
+  'Diversión Anthony': Compass
 };
 
 export function CategoriaIcon({ codigo, size = 18, withBadge = false, className = '' }) {

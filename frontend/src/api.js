@@ -166,6 +166,10 @@ export const api = {
   // Transacciones (Ingresos, Gastos y Ahorros unificados)
   getTransacciones: (filtros = {}) =>
     request(`/transacciones${buildQuery(filtros)}`),
+  getTransaccion: (id) =>
+    request(`/transacciones/${id}`),
+  getAdjuntoTransaccion: (id) =>
+    request(`/transacciones/${id}/adjunto`),
   crearTransaccion: (payload) =>
     request('/transacciones', { method: 'POST', body: JSON.stringify(payload) }),
   editarTransaccion: (id, payload) =>
